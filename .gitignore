@@ -12,7 +12,6 @@ vendor/
 node_modules/
 
 # Runtime/temporary data
-storage/exports/
 gac-leads/
 *.log
 *.cache

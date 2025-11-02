@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: gac-leads-app
+    ports:
+      - "8080:80"
+    env_file: .env
+    environment:
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+    depends_on:
+      - db
+    volumes:
+      - storage_exports:/var/www/html/storage/exports
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: gac-leads-worker
+    command: >
+      bash -lc "while true; do php /var/www/html/tools/process_lead_jobs.php; sleep 30; done"
+    env_file: .env
+    environment:
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+    depends_on:
+      - db
+    volumes:
+      - storage_exports:/var/www/html/storage/exports
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    container_name: gac-leads-db
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-leads-gac}
+      MYSQL_USER: ${DB_USER:-root}
+      MYSQL_PASSWORD: ${DB_PASS:-secret}
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:-secret}
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  storage_exports:
