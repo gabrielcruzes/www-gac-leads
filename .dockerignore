@@ -2,7 +2,7 @@
 .github
 .env
 .env.*
-!.env.example
+.env.example
 vendor
 node_modules
 docker-compose.yml
