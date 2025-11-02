@@ -106,10 +106,133 @@ if (!function_exists('env')) {
     }
 }
 
-define('DB_HOST', env('DB_HOST', '127.0.0.1'));
-define('DB_NAME', env('DB_NAME', 'leads-gac'));
-define('DB_USER', env('DB_USER', 'root'));
-define('DB_PASS', env('DB_PASS', '123'));
+if (!function_exists('parseDatabaseUrl')) {
+    /**
+     * Interpreta uma URL de conexao MySQL (ex.: mysql://user:pass@host:3306/db?charset=utf8mb4).
+     *
+     * @return array{host?:string,port?:int,user?:string,pass?:string,name?:string,charset?:string}|array{}
+     */
+    function parseDatabaseUrl(string $url): array
+    {
+        if ($url === '') {
+            return [];
+        }
+
+        // Permite strings do tipo mysql:// sem obrigatoriamente ter esquema http.
+        if (strpos($url, '://') === false) {
+            return [];
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || empty($parts['host'])) {
+            return [];
+        }
+
+        $database = isset($parts['path']) ? ltrim($parts['path'], '/') : '';
+
+        $config = [
+            'host' => $parts['host'],
+        ];
+
+        if (isset($parts['port'])) {
+            $config['port'] = (int) $parts['port'];
+        }
+
+        if (isset($parts['user'])) {
+            $config['user'] = $parts['user'];
+        }
+
+        if (isset($parts['pass'])) {
+            $config['pass'] = $parts['pass'];
+        }
+
+        if ($database !== '') {
+            $config['name'] = $database;
+        }
+
+        if (!empty($parts['query'])) {
+            parse_str($parts['query'], $queryParams);
+            if (isset($queryParams['charset'])) {
+                $config['charset'] = $queryParams['charset'];
+            }
+        }
+
+        return $config;
+    }
+}
+
+// Inicializa configuracao padrao
+$databaseConfig = [
+    'host' => env('DB_HOST'),
+    'name' => env('DB_NAME'),
+    'user' => env('DB_USER'),
+    'pass' => env('DB_PASS'),
+    'port' => env('DB_PORT'),
+    'charset' => env('DB_CHARSET'),
+];
+
+// Verifica variacoes de URL completas
+$databaseUrlKeys = [
+    'DATABASE_URL',
+    'DB_URL',
+    'JAWSDB_URL',
+    'CLEARDB_DATABASE_URL',
+];
+
+$databaseUrl = null;
+foreach ($databaseUrlKeys as $urlKey) {
+    $candidate = env($urlKey);
+    if ($candidate) {
+        $databaseUrl = $candidate;
+        break;
+    }
+}
+
+if ($databaseUrl) {
+    $parsed = parseDatabaseUrl($databaseUrl);
+    foreach ($parsed as $key => $value) {
+        if ($value !== null && $value !== '') {
+            $databaseConfig[$key] = $value;
+        }
+    }
+}
+
+// Aceita DB_HOST no formato mysql://user:pass@host:port/db
+$hostValue = $databaseConfig['host'] ?? null;
+if (is_string($hostValue) && strpos($hostValue, '://') !== false) {
+    $parsed = parseDatabaseUrl($hostValue);
+    foreach ($parsed as $key => $value) {
+        if ($key === 'host' || !isset($databaseConfig[$key]) || $databaseConfig[$key] === null || $databaseConfig[$key] === '') {
+            $databaseConfig[$key] = $value;
+        }
+    }
+}
+
+// Suporta formato host:porta sem protocolo
+if (is_string($databaseConfig['host']) && strpos($databaseConfig['host'], '://') === false) {
+    $hostPieces = explode(':', $databaseConfig['host'], 2);
+    if (count($hostPieces) === 2 && $hostPieces[0] !== '' && $hostPieces[1] !== '') {
+        $databaseConfig['host'] = $hostPieces[0];
+        if (empty($databaseConfig['port'])) {
+            $databaseConfig['port'] = (int) $hostPieces[1];
+        }
+    }
+}
+
+// Valores padrao finais
+$databaseConfig['host'] = $databaseConfig['host'] ?: '127.0.0.1';
+$databaseConfig['name'] = $databaseConfig['name'] ?: 'leads-gac';
+$databaseConfig['user'] = $databaseConfig['user'] ?: 'root';
+$databaseConfig['pass'] = $databaseConfig['pass'] ?? '123';
+$databaseConfig['port'] = $databaseConfig['port'] ?: 3306;
+$databaseConfig['charset'] = $databaseConfig['charset'] ?: 'utf8mb4';
+
+define('DB_HOST', $databaseConfig['host']);
+define('DB_NAME', $databaseConfig['name']);
+define('DB_USER', $databaseConfig['user']);
+define('DB_PASS', $databaseConfig['pass']);
+define('DB_PORT', (int) $databaseConfig['port']);
+define('DB_CHARSET', $databaseConfig['charset']);
 
 define('CASA_DOS_DADOS_API_KEY', env('CASA_DOS_DADOS_API_KEY', 'changeme'));
 define('LEAD_VIEW_COST', (int) env('LEAD_VIEW_COST', 1));

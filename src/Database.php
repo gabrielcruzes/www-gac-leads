@@ -26,7 +26,13 @@ class Database
     {
         if (self::$instance === null) {
             try {
-                $dsn = sprintf('mysql:host=%s;dbname=%s;charset=utf8mb4', DB_HOST, DB_NAME);
+                $dsn = sprintf(
+                    'mysql:host=%s;port=%d;dbname=%s;charset=%s',
+                    DB_HOST,
+                    defined('DB_PORT') ? (int) DB_PORT : 3306,
+                    DB_NAME,
+                    defined('DB_CHARSET') ? DB_CHARSET : 'utf8mb4'
+                );
                 $options = [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
