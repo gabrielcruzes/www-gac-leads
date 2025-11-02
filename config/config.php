@@ -9,19 +9,85 @@
 $projectRoot = dirname(__DIR__);
 $envFile = $projectRoot . DIRECTORY_SEPARATOR . '.env';
 
-// Carrega valores do .env local, se existir.
-if (file_exists($envFile)) {
-    $envValues = parse_ini_file($envFile, false, INI_SCANNER_RAW);
+if (!function_exists('loadEnvFile')) {
+    /**
+     * Carrega variaveis definidas em um arquivo .env simples.
+     *
+     * Suporta comentarios (# ou ;) e valores com aspas simples/duplas.
+     * Mantem intactas variaveis ja definidas no ambiente.
+     */
+    function loadEnvFile(string $path): void
+    {
+        if (!is_readable($path)) {
+            return;
+        }
 
-    if (is_array($envValues)) {
-        foreach ($envValues as $envKey => $envValue) {
-            // Preserva variaveis ja definidas no ambiente do servidor.
-            if (getenv($envKey) === false && !array_key_exists($envKey, $_ENV)) {
-                putenv(sprintf('%s=%s', $envKey, $envValue));
-                $_ENV[$envKey] = $envValue;
+        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '' || strpos($line, '#') === 0 || strpos($line, ';') === 0) {
+                continue;
             }
+
+            if (strpos($line, 'export ') === 0) {
+                $line = trim(substr($line, 7));
+            }
+
+            if (strpos($line, '=') === false) {
+                continue;
+            }
+
+            [$rawKey, $rawValue] = explode('=', $line, 2);
+
+            $key = trim($rawKey);
+            if ($key === '') {
+                continue;
+            }
+
+            $value = trim($rawValue);
+
+            // Remove comentarios inline quando o valor nao esta delimitado por aspas.
+            if ($value !== '' && $value[0] !== '"' && $value[0] !== "'") {
+                $commentPos = strpos($value, ' #');
+                if ($commentPos !== false) {
+                    $value = substr($value, 0, $commentPos);
+                }
+
+                $commentPos = strpos($value, ' ;');
+                if ($commentPos !== false) {
+                    $value = substr($value, 0, $commentPos);
+                }
+
+                $value = trim($value);
+            }
+
+            // Remove aspas externas, se existirem.
+            if (preg_match('/^([\'"])(.*)\1$/', $value, $matches)) {
+                $value = $matches[2];
+            }
+
+            // Converte escapes simples de nova linha e retorno de carro.
+            $value = str_replace(['\n', '\r'], ["\n", "\r"], $value);
+
+            if (getenv($key) !== false || isset($_ENV[$key]) || isset($_SERVER[$key])) {
+                continue;
+            }
+
+            putenv(sprintf('%s=%s', $key, $value));
+            $_ENV[$key] = $value;
+            $_SERVER[$key] = $value;
         }
     }
+}
+
+// Carrega valores do .env local, se existir.
+if (file_exists($envFile)) {
+    loadEnvFile($envFile);
 }
 
 if (!function_exists('env')) {
@@ -30,7 +96,7 @@ if (!function_exists('env')) {
      */
     function env(string $key, $default = null)
     {
-        $value = $_ENV[$key] ?? getenv($key);
+        $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
 
         if ($value === false || $value === null || $value === '') {
             return $default;
