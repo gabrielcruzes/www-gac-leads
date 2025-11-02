@@ -1,0 +1,18 @@
+Options +FollowSymLinks
+RewriteEngine On
+
+# Allow CSV exports stored in storage/exports.
+RewriteRule ^storage/exports/ - [L]
+
+# Block direct access to sensitive directories.
+RewriteRule ^(config|src|database|storage)(/.*)?$ - [F,L]
+
+# Redirect the root to the public application.
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^$ public/index.php [L]
+
+# Forward any other missing path to the public folder.
+RewriteCond %{REQUEST_URI} !^/public/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.+)$ public/$1 [L]

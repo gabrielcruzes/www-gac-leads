@@ -1,0 +1,24 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor config
+.idea/
+.vscode/
+
+# Dependencies
+vendor/
+node_modules/
+
+# Runtime/temporary data
+storage/exports/
+gac-leads/
+*.log
+*.cache
+
+# OS metadata
+Thumbs.db
+ehthumbs.db
+.DS_Store
+Icon?
