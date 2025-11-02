@@ -16,6 +16,13 @@ require_once __DIR__ . '/components.php';
 Auth::requireLogin();
 
 $user = Auth::user();
+
+if ($user === null) {
+    Auth::logout();
+    header('Location: login.php');
+    exit;
+}
+
 $credits = $user['credits'] ?? 0;
 $exports = ExportService::listarHistorico((int) $user['id']);
 $recentExports = array_slice($exports, 0, 5);
