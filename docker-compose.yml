@@ -13,8 +13,12 @@ services:
       - storage_exports:/var/www/html/storage/exports
     labels:
       - traefik.enable=true
-      - traefik.http.routers.gac-leads.rule=Host(`gacleads-gac-leads-7oftvq-4c6993-191-101-71-226.traefik.me`)
+      - traefik.http.routers.gac-leads.rule=Host(`leads.gacmedia.com.br`)
       - traefik.http.routers.gac-leads.entrypoints=web,websecure
+      - traefik.http.routers.gac-leads.tls=true
+      - traefik.http.routers.gac-leads.tls.certresolver=dokploy
+      - traefik.http.middlewares.gac-leads-https.redirectscheme.scheme=https
+      - traefik.http.routers.gac-leads.middlewares=gac-leads-https
       - traefik.http.services.gac-leads.loadbalancer.server.port=80
     restart: unless-stopped
 
