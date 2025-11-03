@@ -4,8 +4,6 @@ services:
   app:
     build: .
     container_name: gac-leads-app
-    ports:
-      - "8080:80"
     env_file: .env
     environment:
       TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
@@ -13,6 +11,11 @@ services:
       - db
     volumes:
       - storage_exports:/var/www/html/storage/exports
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.gac-leads.rule=Host(`gacleads-gac-leads-7oftvq-4c6993-191-101-71-226.traefik.me`)
+      - traefik.http.routers.gac-leads.entrypoints=web,websecure
+      - traefik.http.services.gac-leads.loadbalancer.server.port=80
     restart: unless-stopped
 
   worker:
