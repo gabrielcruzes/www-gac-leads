@@ -38,7 +38,7 @@ $userAtualizado = Auth::user();
 $saldo = $userAtualizado['credits'] ?? 0;
 //TODO Pagamento Integrado
 $planos = [
-    ['credits' => 0, 'amount' => 9.90],
+    ['credits' => 50, 'amount' => 9.90],
     ['credits' => 0, 'amount' => 39.90],
     ['credits' => 0, 'amount' => 69.90],
 ];
