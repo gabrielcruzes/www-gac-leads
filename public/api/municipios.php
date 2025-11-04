@@ -45,34 +45,58 @@ if (is_file($municipioCacheFile) && (time() - filemtime($municipioCacheFile) < $
  */
 function brasilApiGet(string $url): ?array
 {
-    global $http_response_header;
+    $headers = [
+        'Accept: application/json',
+        'User-Agent: GAC-Leads/1.0',
+    ];
 
-    $http_response_header = [];
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+        $body = curl_exec($ch);
+        if ($body === false) {
+            curl_close($ch);
+            return null;
+        }
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+    } else {
+        global $http_response_header;
 
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'GET',
-            'timeout' => 10,
-            'header' => "Accept: application/json\r\nUser-Agent: GAC-Leads/1.0\r\n",
-        ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-        ],
-    ]);
+        $http_response_header = [];
 
-    $response = @file_get_contents($url, false, $context);
-    if ($response === false) {
-        return null;
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 10,
+                'header' => implode("\r\n", $headers) . "\r\n",
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $body = @file_get_contents($url, false, $context);
+        if ($body === false) {
+            return null;
+        }
+
+        $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
+        if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
+            return null;
+        }
+        $status = (int) $statusMatch[1];
     }
 
-    $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
-    if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
-        return null;
-    }
-
-    $status = (int) $statusMatch[1];
-    $decoded = json_decode($response, true);
+    $decoded = json_decode($body, true);
 
     return [
         'status' => $status,
