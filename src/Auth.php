@@ -1,8 +1,8 @@
-﻿<?php
+<?php
 /**
  * src/Auth.php
  *
- * Regras de autenticação simples: registro, login e controle de sessão.
+ * Authentication helpers: registration, login and session control.
  */
 
 namespace App;
@@ -14,7 +14,7 @@ require_once __DIR__ . '/Database.php';
 class Auth
 {
     /**
-     * Registra um novo usuário e concede créditos iniciais.
+     * Register a new user and grant initial credits.
      */
     public static function register(string $name, string $email, string $password): bool
     {
@@ -32,17 +32,17 @@ class Auth
                 ':name' => $name,
                 ':email' => $email,
                 ':password_hash' => $passwordHash,
-                ':credits' => 1, // credito inicial padrao
+                ':credits' => 1, // initial credit
                 ':role' => $role,
             ]);
         } catch (PDOException $e) {
-            // TODO registrar o erro em um log centralizado
+            // TODO: log the error instead of swallowing it silently.
             return false;
         }
     }
 
     /**
-     * Realiza login e persiste o ID do usuário em sessão.
+     * Perform login and store the user id in session.
      */
     public static function login(string $email, string $password): bool
     {
@@ -63,7 +63,7 @@ class Auth
     }
 
     /**
-     * Remove os dados da sessão e efetua logout.
+     * Destroy the current session.
      */
     public static function logout(): void
     {
@@ -76,7 +76,7 @@ class Auth
     }
 
     /**
-     * Verifica se há usuário autenticado.
+     * Check if a user is logged in.
      */
     public static function check(): bool
     {
@@ -84,7 +84,7 @@ class Auth
     }
 
     /**
-     * Verifica se o usuário autenticado possui perfil admin.
+     * Check whether the authenticated user has admin privileges.
      */
     public static function isAdmin(): bool
     {
@@ -102,7 +102,7 @@ class Auth
     }
 
     /**
-     * Retorna o usuário autenticado.
+     * Return the authenticated user.
      */
     public static function user(): ?array
     {
@@ -119,7 +119,7 @@ class Auth
     }
 
     /**
-     * Garante acesso autenticado, redirecionando para login quando necessário.
+     * Enforce authentication in routes.
      */
     public static function requireLogin(): void
     {
@@ -130,7 +130,7 @@ class Auth
     }
 
     /**
-     * Garante acesso exclusivo a admins.
+     * Enforce admin access.
      */
     public static function requireAdmin(): void
     {
@@ -146,7 +146,3 @@ class Auth
         }
     }
 }
-
-
-
-
