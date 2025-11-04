@@ -15,6 +15,8 @@ RUN mkdir -p storage/exports && \
     chown -R www-data:www-data storage && \
     find storage -type d -exec chmod 775 {} \; && \
     find storage -type f -exec chmod 664 {} \;
+RUN apt-get update && apt-get install -y libcurl4-openssl-dev \
+    && docker-php-ext-install curl
 
 EXPOSE 80
 EXPOSE 3000

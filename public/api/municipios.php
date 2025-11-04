@@ -50,7 +50,7 @@ if (!preg_match('/^[A-Z]{2}$/', $uf)) {
 
 $projectRoot = dirname(__DIR__, 2);
 $cacheDir = $projectRoot . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache';
-$cacheTtl = 86400; // 24 horas
+$cacheTtl\ = 600; // 24 horas
 $statesCacheTtl = 604800; // 7 dias
 
 if (!is_dir($cacheDir)) {
@@ -339,3 +339,4 @@ if ($jsonPayload === false) {
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: public, max-age=3600');
 echo $jsonPayload;
+
