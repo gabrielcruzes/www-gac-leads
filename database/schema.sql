@@ -24,6 +24,7 @@ CREATE TABLE users (
   password_hash VARCHAR(255) NOT NULL,
   credits INT NOT NULL DEFAULT 0,
   role ENUM('user','admin') DEFAULT 'user',
+  must_reset_password TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

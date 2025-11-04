@@ -21,7 +21,7 @@ $query = trim($_GET['q'] ?? '');
 
 if ($query !== '') {
     $searchStmt = $pdo->prepare("
-        SELECT id, name, email, credits, role, created_at
+        SELECT id, name, email, credits, role, must_reset_password, created_at
         FROM users
         WHERE name LIKE :term OR email LIKE :term
         ORDER BY created_at DESC
@@ -31,7 +31,7 @@ if ($query !== '') {
     $users = $searchStmt->fetchAll() ?: [];
 } else {
     $listStmt = $pdo->query("
-        SELECT id, name, email, credits, role, created_at
+        SELECT id, name, email, credits, role, must_reset_password, created_at
         FROM users
         ORDER BY created_at DESC
         LIMIT 100
@@ -103,8 +103,18 @@ renderAdminPageStart('Usuarios', 'users');
                 </thead>
                 <tbody>
                     <?php foreach ($users as $user): ?>
+                        <?php $resetPending = ((int) ($user['must_reset_password'] ?? 0)) === 1; ?>
                         <tr class="border-b border-slate-100 align-top">
-                            <td class="px-6 py-3 text-slate-700 w-48"><?php echo htmlspecialchars($user['name'] ?? '-'); ?></td>
+                            <td class="px-6 py-3 text-slate-700 w-48">
+                                <div class="flex flex-col gap-1">
+                                    <span><?php echo htmlspecialchars($user['name'] ?? '-'); ?></span>
+                                    <?php if ($resetPending): ?>
+                                        <span class="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                                            Reset pendente
+                                        </span>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
                             <td class="px-6 py-3 text-slate-600 w-64"><?php echo htmlspecialchars($user['email'] ?? '-'); ?></td>
                             <td class="px-6 py-3">
                                 <span class="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-600">
@@ -151,8 +161,6 @@ renderAdminPageStart('Usuarios', 'users');
                                                 </button>
                                             </div>
                                         </form>
-                                    <?php endif; ?>
-                                    <?php if ((int) $user['id'] !== (int) ($_SESSION['user_id'] ?? 0)): ?>
                                         <form method="post" action="update-role.php" class="flex flex-col gap-2 md:flex-row md:items-center">
                                             <input type="hidden" name="user_id" value="<?php echo (int) $user['id']; ?>">
                                             <?php if ($user['role'] === 'admin'): ?>
@@ -172,6 +180,25 @@ renderAdminPageStart('Usuarios', 'users');
                                                     Promover a admin
                                                 </button>
                                             <?php endif; ?>
+                                        </form>
+                                        <form method="post" action="reset-user-password.php" class="flex items-center">
+                                            <input type="hidden" name="user_id" value="<?php echo (int) $user['id']; ?>">
+                                            <button
+                                                type="submit"
+                                                class="rounded-lg border border-amber-300 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-amber-700 hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto"
+                                                <?php echo $resetPending ? 'disabled' : ''; ?>
+                                            >
+                                                <?php echo $resetPending ? 'Reset pendente' : 'Forcar reset de senha'; ?>
+                                            </button>
+                                        </form>
+                                        <form method="post" action="delete-user.php" class="flex items-center" onsubmit="return confirm('Confirma a exclusao definitiva deste usuario? Esta acao nao pode ser desfeita.');">
+                                            <input type="hidden" name="user_id" value="<?php echo (int) $user['id']; ?>">
+                                            <button
+                                                type="submit"
+                                                class="rounded-lg border border-red-200 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-red-600 hover:bg-red-50 md:w-auto"
+                                            >
+                                                Excluir usuario
+                                            </button>
                                         </form>
                                     <?php endif; ?>
                                 </div>

@@ -14,10 +14,34 @@ require_once __DIR__ . '/Database.php';
 class Auth
 {
     /**
+     * Guarantees that recently added columns exist.
+     */
+    private static function ensureSchema(): void
+    {
+        static $checked = false;
+
+        if ($checked) {
+            return;
+        }
+
+        $checked = true;
+
+        $pdo = Database::getConnection();
+
+        try {
+            $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_reset_password TINYINT(1) NOT NULL DEFAULT 0");
+        } catch (PDOException $e) {
+            // Ignore failure: column may already exist or user has no privileges.
+        }
+    }
+
+    /**
      * Register a new user and grant initial credits.
      */
     public static function register(string $name, string $email, string $password): bool
     {
+        self::ensureSchema();
+
         $pdo = Database::getConnection();
 
         try {
@@ -32,7 +56,7 @@ class Auth
                 ':name' => $name,
                 ':email' => $email,
                 ':password_hash' => $passwordHash,
-                ':credits' => 1, // initial credit
+                ':credits' => 5, // initial credit
                 ':role' => $role,
             ]);
         } catch (PDOException $e) {
@@ -46,6 +70,8 @@ class Auth
      */
     public static function login(string $email, string $password): bool
     {
+        self::ensureSchema();
+
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
@@ -58,6 +84,7 @@ class Auth
         $_SESSION['user_id'] = (int) $user['id'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['user_role'] = $user['role'] ?? 'user';
+        $_SESSION['must_reset_password'] = (bool) ($user['must_reset_password'] ?? false);
 
         return true;
     }
@@ -106,6 +133,8 @@ class Auth
      */
     public static function user(): ?array
     {
+        self::ensureSchema();
+
         if (!self::check()) {
             return null;
         }
@@ -114,6 +143,10 @@ class Auth
         $stmt = $pdo->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $_SESSION['user_id']]);
         $user = $stmt->fetch();
+
+        if ($user) {
+            $_SESSION['must_reset_password'] = (bool) ($user['must_reset_password'] ?? false);
+        }
 
         return $user ?: null;
     }
@@ -127,6 +160,11 @@ class Auth
             header('Location: login.php');
             exit;
         }
+
+        if (self::mustResetPassword() && !self::isPasswordResetRoute()) {
+            header('Location: /reset-password.php');
+            exit;
+        }
     }
 
     /**
@@ -134,15 +172,58 @@ class Auth
      */
     public static function requireAdmin(): void
     {
-        if (!self::check()) {
-            header('Location: /login.php');
-            exit;
-        }
+        self::requireLogin();
 
         if (!self::isAdmin()) {
             $_SESSION['flash_error'] = 'Voce nao tem permissao para acessar esta area.';
             header('Location: /index.php');
             exit;
         }
+    }
+
+    /**
+     * Whether the user must update their password.
+     */
+    public static function mustResetPassword(): bool
+    {
+        if (!self::check()) {
+            return false;
+        }
+
+        if (array_key_exists('must_reset_password', $_SESSION)) {
+            return (bool) $_SESSION['must_reset_password'];
+        }
+
+        $user = self::user();
+        $mustReset = (bool) ($user['must_reset_password'] ?? false);
+        $_SESSION['must_reset_password'] = $mustReset;
+
+        return $mustReset;
+    }
+
+    /**
+     * Persistently clears the password reset flag.
+     */
+    public static function clearPasswordResetFlag(): void
+    {
+        if (!self::check()) {
+            return;
+        }
+
+        $_SESSION['must_reset_password'] = false;
+
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare('UPDATE users SET must_reset_password = 0 WHERE id = :id');
+        $stmt->execute([':id' => $_SESSION['user_id']]);
+    }
+
+    /**
+     * Detects whether the current route is the forced password update page.
+     */
+    private static function isPasswordResetRoute(): bool
+    {
+        $script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+
+        return in_array($script, ['reset-password.php'], true);
     }
 }
