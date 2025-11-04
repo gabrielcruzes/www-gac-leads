@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * public/admin/update-credits.php
  *

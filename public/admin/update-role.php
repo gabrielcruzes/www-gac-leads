@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * public/admin/update-role.php
  *
