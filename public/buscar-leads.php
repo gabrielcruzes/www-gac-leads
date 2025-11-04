@@ -611,6 +611,23 @@ renderPageStart('Buscar Leads', 'buscar');
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>
+
+        <div class="bg-white rounded-xl shadow p-6 mt-8" id="ncm-helper-card">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-blue-700">Consulta NCM</h2>
+                    <p class="text-sm text-slate-500">Pesquise codigos NCM pela descricao ou codigo para apoiar sua prospeccao.</p>
+                </div>
+                <form id="ncm-search-form" class="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                    <input type="search" id="ncm-query" name="q" class="w-full md:w-72 border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Ex.: cosmeticos, xampus">
+                    <button type="submit" class="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white font-medium px-4 py-2 rounded-lg">Buscar NCM</button>
+                </form>
+            </div>
+            <p id="ncm-status" class="text-xs text-slate-500 mb-3">Digite um termo para pesquisar. Resultados limitados aos 25 primeiros itens.</p>
+            <div id="ncm-results" class="overflow-x-auto">
+                <p class="text-sm text-slate-500">Nenhuma pesquisa realizada ainda.</p>
+            </div>
+        </div>
     </div>
 
 <?php if (!empty($leads)): ?>
@@ -730,6 +747,27 @@ renderPageStart('Buscar Leads', 'buscar');
             const defaultMunicipioOptionLabel = 'Todos os municipios';
             let municipioRequestId = 0;
             let lastMunicipioUf = '';
+            const escapeHtml = function (value) {
+                if (value === undefined || value === null) {
+                    return '';
+                }
+                return String(value).replace(/[&<>"']/g, function (character) {
+                    switch (character) {
+                        case '&':
+                            return '&amp;';
+                        case '<':
+                            return '&lt;';
+                        case '>':
+                            return '&gt;';
+                        case '"':
+                            return '&quot;';
+                        case '\'':
+                            return '&#39;';
+                        default:
+                            return character;
+                    }
+                });
+            };
 
             const normalizeMunicipioValue = function (value) {
                 if (!value) {
@@ -1157,6 +1195,221 @@ renderPageStart('Buscar Leads', 'buscar');
                 });
 
                 updateHidden();
+            }
+
+            const NCM_MIN_QUERY_LENGTH = 2;
+            const NCM_LIMIT = 25;
+            const ncmForm = document.getElementById('ncm-search-form');
+            const ncmInput = document.getElementById('ncm-query');
+            const ncmStatus = document.getElementById('ncm-status');
+            const ncmResults = document.getElementById('ncm-results');
+            let ncmRequestId = 0;
+            let ncmDebounceHandle = null;
+
+            const setNcmStatus = function (message, isError) {
+                if (!ncmStatus) {
+                    return;
+                }
+                ncmStatus.textContent = message;
+                if (isError) {
+                    ncmStatus.classList.add('text-red-600');
+                    ncmStatus.classList.remove('text-slate-500');
+                } else {
+                    ncmStatus.classList.remove('text-red-600');
+                    ncmStatus.classList.add('text-slate-500');
+                }
+            };
+
+            const renderNcmResults = function (items) {
+                if (!ncmResults) {
+                    return;
+                }
+
+                if (!Array.isArray(items) || items.length === 0) {
+                    ncmResults.innerHTML = '<p class="text-sm text-slate-500">Nenhum NCM encontrado para os termos informados.</p>';
+                    return;
+                }
+
+                const rows = items.map(function (item) {
+                    const code = item && item.codigo ? String(item.codigo) : '-';
+                    const description = item && item.descricao ? String(item.descricao) : '-';
+                    const start = item && item.data_inicio ? String(item.data_inicio) : '-';
+                    const end = item && item.data_fim ? String(item.data_fim) : '-';
+                    const vigencia = (start !== '-' || end !== '-') ? (start + ' a ' + end) : '-';
+
+                    return (
+                        '<tr class="border-b border-slate-100">' +
+                            '<td class="px-4 py-2 font-mono text-sm text-slate-700">' + escapeHtml(code) + '</td>' +
+                            '<td class="px-4 py-2 text-sm text-slate-600">' + escapeHtml(description) + '</td>' +
+                            '<td class="px-4 py-2 text-xs text-slate-500">' + escapeHtml(vigencia) + '</td>' +
+                            '<td class="px-4 py-2 text-right">' +
+                                '<button type="button" class="ncm-copy-btn text-blue-600 hover:text-blue-700 text-xs font-medium" data-ncm-code="' + escapeHtml(code) + '" data-ncm-description="' + escapeHtml(description) + '">Copiar codigo</button>' +
+                            '</td>' +
+                        '</tr>'
+                    );
+                }).join('');
+
+                const table = '' +
+                    '<table class="min-w-full text-sm">' +
+                        '<thead>' +
+                            '<tr class="bg-blue-50 text-blue-700 text-left">' +
+                                '<th class="px-4 py-2 font-medium">Codigo</th>' +
+                                '<th class="px-4 py-2 font-medium">Descricao</th>' +
+                                '<th class="px-4 py-2 font-medium">Vigencia</th>' +
+                                '<th class="px-4 py-2 font-medium text-right">Acoes</th>' +
+                            '</tr>' +
+                        '</thead>' +
+                        '<tbody>' + rows + '</tbody>' +
+                    '</table>';
+
+                ncmResults.innerHTML = table;
+            };
+
+            const fetchNcm = async function (query) {
+                ncmRequestId += 1;
+                const currentRequest = ncmRequestId;
+
+                setNcmStatus('Carregando resultados...', false);
+                if (ncmResults) {
+                    ncmResults.innerHTML = '<p class="text-sm text-slate-500">Consultando base de NCM...</p>';
+                }
+
+                try {
+                    const params = new URLSearchParams();
+                    params.set('limit', String(NCM_LIMIT));
+                    if (query) {
+                        params.set('q', query);
+                    }
+
+                    const response = await fetch('api/ncm.php?' + params.toString());
+                    if (currentRequest !== ncmRequestId) {
+                        return;
+                    }
+                    if (!response.ok) {
+                        throw new Error('HTTP ' + response.status);
+                    }
+
+                    const payload = await response.json();
+                    if (currentRequest !== ncmRequestId) {
+                        return;
+                    }
+
+                    const items = Array.isArray(payload) ? payload : [];
+                    renderNcmResults(items);
+
+                    if (items.length > 0) {
+                        setNcmStatus('Mostrando ' + items.length + ' resultado' + (items.length > 1 ? 's' : '') + '.', false);
+                    } else {
+                        setNcmStatus('Nenhum NCM encontrado para "' + query + '".', false);
+                    }
+                } catch (error) {
+                    if (currentRequest !== ncmRequestId) {
+                        return;
+                    }
+                    console.error('Erro ao consultar NCM', error);
+                    setNcmStatus('Nao foi possivel carregar os NCMs. Tente novamente.', true);
+                    if (ncmResults) {
+                        ncmResults.innerHTML = '<p class="text-sm text-red-600">Erro ao carregar os dados no momento.</p>';
+                    }
+                }
+            };
+
+            const performNcmSearch = function (rawQuery) {
+                const query = (rawQuery || '').trim();
+                if (query === '') {
+                    setNcmStatus('Digite um termo para pesquisar. Resultados limitados aos 25 primeiros itens.', false);
+                    if (ncmResults) {
+                        ncmResults.innerHTML = '<p class="text-sm text-slate-500">Informe um termo com pelo menos ' + NCM_MIN_QUERY_LENGTH + ' caracteres.</p>';
+                    }
+                    return;
+                }
+
+                if (query.length < NCM_MIN_QUERY_LENGTH) {
+                    setNcmStatus('Digite pelo menos ' + NCM_MIN_QUERY_LENGTH + ' caracteres para pesquisar.', false);
+                    if (ncmResults) {
+                        ncmResults.innerHTML = '<p class="text-sm text-slate-500">Termo muito curto para pesquisar.</p>';
+                    }
+                    return;
+                }
+
+                fetchNcm(query);
+            };
+
+            const scheduleNcmSearch = function () {
+                if (!ncmInput) {
+                    return;
+                }
+                const value = ncmInput.value || '';
+                if (ncmDebounceHandle) {
+                    clearTimeout(ncmDebounceHandle);
+                }
+                ncmDebounceHandle = setTimeout(function () {
+                    performNcmSearch(value);
+                }, 400);
+            };
+
+            if (ncmForm && ncmInput) {
+                ncmForm.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    performNcmSearch(ncmInput.value || '');
+                });
+
+                ncmInput.addEventListener('input', scheduleNcmSearch);
+            }
+
+            if (ncmResults) {
+                ncmResults.addEventListener('click', function (event) {
+                    const target = event.target;
+                    if (!target) {
+                        return;
+                    }
+                    const button = target.closest('.ncm-copy-btn');
+                    if (!button) {
+                        return;
+                    }
+                    const code = button.getAttribute('data-ncm-code') || '';
+                    if (!code) {
+                        setNcmStatus('Codigo NCM nao disponivel para copia.', true);
+                        return;
+                    }
+                    const copyText = code;
+
+                    const onCopySuccess = function () {
+                        setNcmStatus('Codigo ' + code + ' copiado para a area de transferencia.', false);
+                    };
+
+                    const onCopyFailure = function () {
+                        setNcmStatus('Nao foi possivel copiar automaticamente. Copie manualmente: ' + code, true);
+                    };
+
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                        navigator.clipboard.writeText(copyText).then(onCopySuccess).catch(function (clipboardError) {
+                            console.error('Erro ao copiar NCM', clipboardError);
+                            onCopyFailure();
+                        });
+                    } else {
+                        const tempInput = document.createElement('input');
+                        tempInput.type = 'text';
+                        tempInput.value = copyText;
+                        tempInput.setAttribute('readonly', '');
+                        tempInput.style.position = 'absolute';
+                        tempInput.style.left = '-9999px';
+                        document.body.appendChild(tempInput);
+                        tempInput.select();
+                        try {
+                            const succeeded = document.execCommand('copy');
+                            if (succeeded) {
+                                onCopySuccess();
+                            } else {
+                                onCopyFailure();
+                            }
+                        } catch (error) {
+                            console.error('execCommand copy NCM', error);
+                            onCopyFailure();
+                        }
+                        document.body.removeChild(tempInput);
+                    }
+                });
             }
         });
     </script>
