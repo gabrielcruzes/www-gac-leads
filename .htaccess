@@ -1,6 +1,9 @@
 Options +FollowSymLinks
 RewriteEngine On
 
+# Serve favicon requests from the shared assets directory.
+RewriteRule ^favicon\.ico$ public/assets/images/favicon.svg [L,R=302]
+
 # Allow CSV exports stored in storage/exports.
 RewriteRule ^storage/exports/ - [L]
 
