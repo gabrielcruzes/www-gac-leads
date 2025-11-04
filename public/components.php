@@ -25,6 +25,8 @@ function renderPageStart(string $title, string $active = ''): void
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title><?php echo htmlspecialchars($title); ?> | GAC Leads</title>
         <script src="https://cdn.tailwindcss.com"></script>
+        <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+        <link rel="shortcut icon" href="assets/images/favicon.svg">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -36,8 +38,11 @@ function renderPageStart(string $title, string $active = ''): void
     <div class="min-h-screen flex flex-col">
         <header class="bg-white shadow">
             <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-                <div>
-                    <a href="index.php" class="text-xl font-semibold text-blue-700">GAC Leads</a>
+                <div class="flex items-center gap-3">
+                    <a href="index.php" class="flex items-center gap-2">
+                        <img src="assets/images/logo.svg" alt="GAC Leads" class="h-8 w-auto">
+                        <span class="text-xl font-semibold text-blue-700 hidden sm:inline">GAC Leads</span>
+                    </a>
                 </div>
                 <nav class="flex items-center gap-4 text-sm font-medium">
                     <a href="index.php" class="px-3 py-2 rounded-lg <?php echo $active === 'dashboard' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Dashboard</a>

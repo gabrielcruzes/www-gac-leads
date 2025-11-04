@@ -40,6 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | GAC Leads</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+    <link rel="shortcut icon" href="assets/images/favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -49,6 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body class="bg-slate-100 min-h-screen flex items-center justify-center">
     <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-10">
+        <div class="flex justify-center mb-6">
+            <img src="assets/images/logo.svg" alt="GAC Leads" class="h-10 w-auto">
+        </div>
         <h1 class="text-2xl font-semibold text-blue-700 mb-2">Bem-vindo de volta</h1>
         <p class="text-slate-500 mb-6">Entre para acessar seus leads e créditos.</p>
 
