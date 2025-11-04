@@ -2,8 +2,11 @@
 /**
  * public/api/municipios.php
  *
- * Proxy simples para listar municipios de uma UF via API do IBGE.
- * Retorna JSON normalizado e utiliza cache em disco para reduzir chamadas externas.
+ * Proxy simples para listar municipios de uma UF utilizando a BrazilAPI.
+ * A rota tenta primeiro o endpoint oficial /api/v1/cities/:state_id; se o provedor
+ * retornar erro (ainda comum em algumas regioes), fazemos fallback para
+ * /api/ibge/municipios/v1/:uf, tambem disponibilizado pela BrazilAPI.
+ * As respostas sao cacheadas em disco para reduzir latencia e rate limiting.
  */
 
 $uf = strtoupper(trim($_GET['uf'] ?? ''));
@@ -18,80 +21,168 @@ if (!preg_match('/^[A-Z]{2}$/', $uf)) {
 $projectRoot = dirname(__DIR__, 2);
 $cacheDir = $projectRoot . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache';
 $cacheTtl = 86400; // 24 horas
+$statesCacheTtl = 604800; // 7 dias
 
 if (!is_dir($cacheDir)) {
     @mkdir($cacheDir, 0775, true);
 }
 
-$cacheFile = $cacheDir . DIRECTORY_SEPARATOR . 'municipios-' . $uf . '.json';
-$cacheValid = false;
-
-if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $cacheTtl)) {
-    $cacheValid = true;
-}
-
-if ($cacheValid) {
-    $payload = @file_get_contents($cacheFile);
-    if ($payload !== false) {
+$municipioCacheFile = $cacheDir . DIRECTORY_SEPARATOR . 'municipios-' . $uf . '.json';
+if (is_file($municipioCacheFile) && (time() - filemtime($municipioCacheFile) < $cacheTtl)) {
+    $cached = @file_get_contents($municipioCacheFile);
+    if ($cached !== false) {
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: public, max-age=3600');
-        echo $payload;
+        echo $cached;
         exit;
     }
 }
 
-$remoteUrl = sprintf(
-    'https://servicodados.ibge.gov.br/api/v1/localidades/estados/%s/municipios',
-    rawurlencode($uf)
-);
+/**
+ * Executa uma requisicao GET retornando array com status e corpo decodificado.
+ *
+ * @return array{status:int,body:mixed}|null
+ */
+function brasilApiGet(string $url): ?array
+{
+    global $http_response_header;
 
-$context = stream_context_create([
-    'http' => [
-        'method' => 'GET',
-        'timeout' => 8,
-        'header' => "Accept: application/json\r\nUser-Agent: GAC-Leads/1.0\r\n",
-    ],
-    'ssl' => [
-        'verify_peer' => true,
-        'verify_peer_name' => true,
-    ],
-]);
+    $http_response_header = [];
 
-$responseBody = @file_get_contents($remoteUrl, false, $context);
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 10,
+            'header' => "Accept: application/json\r\nUser-Agent: GAC-Leads/1.0\r\n",
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
 
-if ($responseBody === false) {
-    if ($cacheValid) {
-        $payload = @file_get_contents($cacheFile);
-        if ($payload !== false) {
-            header('Content-Type: application/json; charset=utf-8');
-            header('Cache-Control: public, max-age=600');
-            echo $payload;
-            exit;
+    $response = @file_get_contents($url, false, $context);
+    if ($response === false) {
+        return null;
+    }
+
+    $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
+    if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
+        return null;
+    }
+
+    $status = (int) $statusMatch[1];
+    $decoded = json_decode($response, true);
+
+    return [
+        'status' => $status,
+        'body' => $decoded,
+    ];
+}
+
+function loadStateIdMap(string $cacheDir, int $ttl): array
+{
+    $cacheFile = $cacheDir . DIRECTORY_SEPARATOR . 'brazilapi-uf-map.json';
+
+    if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $ttl)) {
+        $cached = @file_get_contents($cacheFile);
+        if ($cached !== false) {
+            $decoded = json_decode($cached, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
         }
     }
 
-    http_response_code(502);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Nao foi possivel consultar os municipios no momento.']);
-    exit;
+    $result = brasilApiGet('https://brasilapi.com.br/api/ibge/uf/v1');
+    if ($result === null || $result['status'] >= 400 || !is_array($result['body'])) {
+        return [];
+    }
+
+    $map = [];
+    foreach ($result['body'] as $state) {
+        if (!isset($state['sigla'], $state['id'])) {
+            continue;
+        }
+        $map[strtoupper($state['sigla'])] = (int) $state['id'];
+    }
+
+    @file_put_contents($cacheFile, json_encode($map, JSON_UNESCAPED_UNICODE));
+
+    return $map;
 }
 
-$decoded = json_decode($responseBody, true);
-if (!is_array($decoded)) {
-    http_response_code(502);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'Resposta inesperada da API do IBGE.']);
-    exit;
+$stateIdMap = loadStateIdMap($cacheDir, $statesCacheTtl);
+$stateId = $stateIdMap[$uf] ?? null;
+
+$cities = null;
+
+if ($stateId !== null) {
+    $citiesResponse = brasilApiGet('https://brasilapi.com.br/api/v1/cities/' . rawurlencode((string) $stateId));
+    if ($citiesResponse !== null && $citiesResponse['status'] < 400 && is_array($citiesResponse['body'])) {
+        $payload = $citiesResponse['body'];
+        $normalizedFromCities = [];
+
+        foreach ($payload as $cityEntry) {
+            if (is_string($cityEntry)) {
+                $normalizedFromCities[] = [
+                    'id' => null,
+                    'nome' => $cityEntry,
+                ];
+                continue;
+            }
+
+            if (is_array($cityEntry)) {
+                $name = $cityEntry['name'] ?? $cityEntry['nome'] ?? null;
+                if ($name === null) {
+                    continue;
+                }
+                $normalizedFromCities[] = [
+                    'id' => $cityEntry['id'] ?? ($cityEntry['codigo_ibge'] ?? null),
+                    'nome' => $name,
+                ];
+            }
+        }
+
+        if (!empty($normalizedFromCities)) {
+            $cities = $normalizedFromCities;
+        }
+    }
 }
 
-$normalized = array_map(static function ($entry) {
-    return [
-        'id' => $entry['id'] ?? null,
-        'nome' => $entry['nome'] ?? null,
-    ];
-}, $decoded);
+if ($cities === null) {
+    $fallbackResponse = brasilApiGet('https://brasilapi.com.br/api/ibge/municipios/v1/' . rawurlencode($uf));
+    if ($fallbackResponse === null || $fallbackResponse['status'] >= 400 || !is_array($fallbackResponse['body'])) {
+        http_response_code(502);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Nao foi possivel consultar os municipios no momento.']);
+        exit;
+    }
 
-$jsonPayload = json_encode($normalized, JSON_UNESCAPED_UNICODE);
+    $cities = array_map(static function ($entry) {
+        $name = null;
+        if (is_array($entry)) {
+            $name = $entry['nome'] ?? $entry['name'] ?? null;
+        } elseif (is_string($entry)) {
+            $name = $entry;
+        }
+
+        return [
+            'id' => is_array($entry) ? ($entry['codigo_ibge'] ?? ($entry['id'] ?? null)) : null,
+            'nome' => $name,
+        ];
+    }, $fallbackResponse['body']);
+}
+
+$cities = array_values(array_filter($cities, static function ($entry) {
+    return isset($entry['nome']) && $entry['nome'] !== null && $entry['nome'] !== '';
+}));
+
+usort($cities, static function ($a, $b) {
+    return strcmp($a['nome'], $b['nome']);
+});
+
+$jsonPayload = json_encode($cities, JSON_UNESCAPED_UNICODE);
 if ($jsonPayload === false) {
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');
@@ -99,7 +190,7 @@ if ($jsonPayload === false) {
     exit;
 }
 
-@file_put_contents($cacheFile, $jsonPayload);
+@file_put_contents($municipioCacheFile, $jsonPayload);
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: public, max-age=3600');
