@@ -39,18 +39,47 @@ const BRAZIL_STATE_ID_MAP = [
     'DF' => 53,
 ];
 
-$uf = strtoupper(trim($_GET['uf'] ?? ''));
+$rawUf = trim((string) ($_GET['uf'] ?? ''));
+$stateId = null;
 
-if (!preg_match('/^[A-Z]{2}$/', $uf)) {
+if ($rawUf === '') {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'UF invalida. Utilize exatamente 2 letras.']);
+    echo json_encode(['error' => 'UF invalida. Informe uma sigla (ex.: SP) ou codigo IBGE (ex.: 35).']);
+    exit;
+}
+
+if (ctype_digit($rawUf)) {
+    $stateIdFromRequest = (int) $rawUf;
+    $ufFromCode = array_search($stateIdFromRequest, BRAZIL_STATE_ID_MAP, true);
+    if ($ufFromCode === false) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Codigo de UF invalido.']);
+        exit;
+    }
+    $uf = $ufFromCode;
+    $stateId = $stateIdFromRequest;
+} else {
+    $uf = strtoupper($rawUf);
+    if (!preg_match('/^[A-Z]{2}$/', $uf)) {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'UF invalida. Informe uma sigla (ex.: SP) ou codigo IBGE (ex.: 35).']);
+        exit;
+    }
+}
+
+if (!is_string($uf) || $uf === '') {
+    http_response_code(400);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => 'UF invalida.']);
     exit;
 }
 
 $projectRoot = dirname(__DIR__, 2);
 $cacheDir = $projectRoot . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'cache';
-$cacheTtl\ = 600; // 24 horas
+$cacheTtl = 600; // 24 horas
 $statesCacheTtl = 604800; // 7 dias
 
 if (!is_dir($cacheDir)) {
@@ -258,7 +287,7 @@ function ibgeGetMunicipios(string $uf): ?array
 }
 
 $stateIdMap = loadStateIdMap();
-$stateId = $stateIdMap[$uf] ?? null;
+$stateId = $stateId ?? ($stateIdMap[$uf] ?? null);
 
 $cities = null;
 
