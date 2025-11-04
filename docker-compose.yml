@@ -13,12 +13,17 @@ services:
       - storage_exports:/var/www/html/storage/exports
     labels:
       - traefik.enable=true
-      - traefik.http.routers.gac-leads.rule=Host(`leads.gacmedia.com.br`)
-      - traefik.http.routers.gac-leads.entrypoints=web,websecure
-      - traefik.http.routers.gac-leads.tls=true
-      - traefik.http.routers.gac-leads.tls.certresolver=dokploy
-      - traefik.http.middlewares.gac-leads-https.redirectscheme.scheme=https
-      - traefik.http.routers.gac-leads.middlewares=gac-leads-https
+      - traefik.http.routers.gac-leads-http.rule=Host(`leads.gacmedia.com.br`)
+      - traefik.http.routers.gac-leads-http.entrypoints=web
+      - traefik.http.routers.gac-leads-http.middlewares=gac-leads-redirect
+      - traefik.http.routers.gac-leads-http.service=gac-leads
+      - traefik.http.routers.gac-leads-https.rule=Host(`leads.gacmedia.com.br`)
+      - traefik.http.routers.gac-leads-https.entrypoints=websecure
+      - traefik.http.routers.gac-leads-https.tls=true
+      - traefik.http.routers.gac-leads-https.tls.certresolver=dokploy
+      - traefik.http.routers.gac-leads-https.service=gac-leads
+      - traefik.http.middlewares.gac-leads-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.gac-leads-redirect.redirectscheme.permanent=true
       - traefik.http.services.gac-leads.loadbalancer.server.port=80
     restart: unless-stopped
 

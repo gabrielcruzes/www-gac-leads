@@ -90,6 +90,21 @@ if (file_exists($envFile)) {
     loadEnvFile($envFile);
 }
 
+// Ajusta informacoes de proxy reverso (Traefik / Dokploy) para HTTPS.
+$forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? $_SERVER['HTTP_X_FORWARDED_SCHEME'] ?? null;
+if (is_string($forwardedProto) && strtolower($forwardedProto) === 'https') {
+    $_SERVER['HTTPS'] = 'on';
+    $_SERVER['SERVER_PORT'] = 443;
+}
+
+if (isset($_SERVER['HTTP_X_FORWARDED_HOST']) && !empty($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+    $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+}
+
+if (isset($_SERVER['HTTP_X_FORWARDED_PORT']) && ctype_digit((string) $_SERVER['HTTP_X_FORWARDED_PORT'])) {
+    $_SERVER['SERVER_PORT'] = (int) $_SERVER['HTTP_X_FORWARDED_PORT'];
+}
+
 if (!function_exists('env')) {
     /**
      * Recupera uma variavel de ambiente com valor padrao opcional.
