@@ -80,10 +80,44 @@ if (!function_exists('parseCurrencyValue')) {
     }
 }
 
+if (!function_exists('normalizeMunicipio')) {
+    function normalizeMunicipio(?string $raw): string
+    {
+        if ($raw === null) {
+            return '';
+        }
+
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $trimmed);
+        if ($converted === false || $converted === null) {
+            $converted = $trimmed;
+        }
+
+        $converted = str_replace(["'", '’', '`', '´'], ' ', $converted);
+
+        $sanitized = preg_replace('/[^A-Za-z0-9\s-]/', '', $converted);
+        if ($sanitized === null) {
+            $sanitized = $converted;
+        }
+
+        $condensed = preg_replace('/\s+/', ' ', $sanitized);
+        if ($condensed === null) {
+            $condensed = $sanitized;
+        }
+
+        return strtoupper(trim($condensed));
+    }
+}
+
 $formState = [
     'cnae' => '',
     'uf' => '',
     'municipio' => '',
+    'municipio_display' => '',
     'quantidade' => 100,
     'pagina' => 1,
     'situacao' => 'ATIVA',
@@ -125,7 +159,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formState['cnae'] = preg_replace('/\D/', '', $cnaeInput);
     $ufRecebida = strtoupper(trim($_POST['uf'] ?? ''));
     $formState['uf'] = $ufRecebida === '' ? '' : $ufRecebida;
-    $formState['municipio'] = trim($_POST['municipio'] ?? '');
+    $municipioRecebido = trim((string) ($_POST['municipio'] ?? ''));
+    $municipioDisplayRecebido = trim((string) ($_POST['municipio_display'] ?? ''));
+    $municipioBase = $municipioRecebido !== '' ? $municipioRecebido : $municipioDisplayRecebido;
+    $formState['municipio'] = normalizeMunicipio($municipioBase);
+    $formState['municipio_display'] = $municipioDisplayRecebido !== '' ? $municipioDisplayRecebido : $municipioBase;
+    if ($formState['municipio_display'] !== '') {
+        $formState['municipio_display'] = trim($formState['municipio_display']);
+    }
     $formState['quantidade'] = max(0, (int) ($_POST['quantidade'] ?? 0));
     $formState['pagina'] = max(1, (int) ($_POST['pagina'] ?? 1));
     $formState['capital_social_minimo'] = trim($_POST['capital_social_minimo'] ?? '');
@@ -203,6 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $filtros = [
             'segmento_label' => $formState['cnae'] !== '' ? 'CNAE ' . $formState['cnae'] : 'Consulta personalizada',
             'municipio' => $formState['municipio'],
+            'municipio_display' => $formState['municipio_display'],
             'quantidade' => $formState['quantidade'],
             'pagina' => $formState['pagina'],
             'situacao_cadastral' => $formState['situacao'],
@@ -339,7 +381,14 @@ renderPageStart('Buscar Leads', 'buscar');
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1">Municipio</label>
-                <input type="text" name="municipio" id="search-municipio" value="<?php echo htmlspecialchars($formState['municipio']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Opcional">
+                <select name="municipio" id="search-municipio" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" data-initial-municipio="<?php echo htmlspecialchars($formState['municipio']); ?>" data-initial-display="<?php echo htmlspecialchars($formState['municipio_display']); ?>" <?php echo $formState['uf'] === '' ? 'disabled' : ''; ?>>
+                    <option value="">Todos os municipios</option>
+                </select>
+                <input type="hidden" name="municipio_display" id="search-municipio-display" value="<?php echo htmlspecialchars($formState['municipio_display']); ?>">
+                <p class="text-xs text-slate-400 mt-1">Escolha uma UF para carregar as cidades disponiveis.</p>
+                <noscript>
+                    <p class="text-xs text-red-500 mt-1">Ative o JavaScript para selecionar municipios.</p>
+                </noscript>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1">Limite de resultados</label>
@@ -505,6 +554,10 @@ renderPageStart('Buscar Leads', 'buscar');
                                 $historicoUf = implode(', ', $historicoUf);
                             }
                             $historicoMunicipio = $filtroRegistro['municipio'] ?? '';
+                            $historicoMunicipioDisplay = $filtroRegistro['municipio_display'] ?? '';
+                            if ($historicoMunicipioDisplay === '' && $historicoMunicipio !== '') {
+                                $historicoMunicipioDisplay = $historicoMunicipio;
+                            }
                             $historicoQuantidade = $filtroRegistro['quantidade'] ?? '';
                             $historicoSituacao = $filtroRegistro['situacao'] ?? ($filtroRegistro['situacao_cadastral'] ?? 'ATIVA');
                             if (is_array($historicoSituacao)) {
@@ -517,6 +570,7 @@ renderPageStart('Buscar Leads', 'buscar');
                             $dadosReaplicar['cnae'] = $historicoCnae;
                             $dadosReaplicar['uf'] = $filtroRegistro['uf'] ?? '';
                             $dadosReaplicar['municipio'] = $historicoMunicipio;
+                            $dadosReaplicar['municipio_display'] = $historicoMunicipioDisplay;
                             $dadosReaplicar['quantidade'] = $historicoQuantidade;
                             $dadosReaplicar['pagina'] = $filtroRegistro['pagina'] ?? 1;
                             $dadosReaplicar['situacao'] = $historicoSituacao;
@@ -530,7 +584,7 @@ renderPageStart('Buscar Leads', 'buscar');
                                     </p>
                                     <p class="text-xs text-slate-500">
                                         UF: <?php echo htmlspecialchars($historicoUf !== '' ? $historicoUf : '-'); ?> |
-                                        Municipio: <?php echo htmlspecialchars($historicoMunicipio !== '' ? $historicoMunicipio : '-'); ?> |
+                                        Municipio: <?php echo htmlspecialchars($historicoMunicipioDisplay !== '' ? $historicoMunicipioDisplay : '-'); ?> |
                                         Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?>
                                     </p>
                                 </div>
@@ -672,6 +726,218 @@ renderPageStart('Buscar Leads', 'buscar');
         document.addEventListener('DOMContentLoaded', function () {
             const searchForm = document.getElementById('lead-search-form');
             const cnaeInput = document.getElementById('search-cnae');
+            const ufSelect = document.getElementById('search-uf');
+            const municipioSelect = document.getElementById('search-municipio');
+            const municipioDisplayInput = document.getElementById('search-municipio-display');
+            const defaultMunicipioOptionLabel = 'Todos os municipios';
+            let municipioRequestId = 0;
+            let lastMunicipioUf = '';
+
+            const normalizeMunicipioValue = function (value) {
+                if (!value) {
+                    return '';
+                }
+
+                let result = String(value);
+                if (typeof result.normalize === 'function') {
+                    result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                }
+
+                result = result.replace(/['`´’]/g, ' ');
+                result = result.replace(/[^A-Za-z0-9\s-]/g, '');
+                result = result.replace(/\s+/g, ' ');
+
+                return result.trim().toUpperCase();
+            };
+
+            const resetMunicipioSelect = function (shouldDisable) {
+                if (!municipioSelect) {
+                    return;
+                }
+
+                municipioSelect.innerHTML = '';
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = defaultMunicipioOptionLabel;
+                municipioSelect.appendChild(option);
+                municipioSelect.disabled = Boolean(shouldDisable);
+                municipioSelect.classList.remove('opacity-60');
+                municipioSelect.dataset.loadedUf = '';
+                lastMunicipioUf = '';
+
+                if (municipioDisplayInput) {
+                    municipioDisplayInput.value = '';
+                }
+            };
+
+            const syncMunicipioDisplay = function () {
+                if (!municipioSelect || !municipioDisplayInput) {
+                    return;
+                }
+
+                const option = municipioSelect.options[municipioSelect.selectedIndex];
+                if (option && option.value !== '') {
+                    municipioDisplayInput.value = option.dataset.display || option.textContent || '';
+                } else {
+                    municipioDisplayInput.value = '';
+                }
+            };
+
+            const populateMunicipios = function (lista, selectedValueNormalized, selectedDisplay) {
+                if (!municipioSelect) {
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+                const baseOption = document.createElement('option');
+                baseOption.value = '';
+                baseOption.textContent = defaultMunicipioOptionLabel;
+                fragment.appendChild(baseOption);
+
+                const normalizedSelectedValue = selectedValueNormalized ? String(selectedValueNormalized).toUpperCase() : '';
+                const normalizedSelectedDisplay = selectedDisplay ? normalizeMunicipioValue(selectedDisplay) : '';
+
+                let selectionApplied = false;
+
+                (Array.isArray(lista) ? lista : [])
+                    .filter(function (item) {
+                        return item && item.nome;
+                    })
+                    .sort(function (a, b) {
+                        return a.nome.localeCompare(b.nome, 'pt-BR');
+                    })
+                    .forEach(function (item) {
+                        const displayName = item.nome;
+                        const normalizedName = normalizeMunicipioValue(displayName);
+                        const option = document.createElement('option');
+                        option.value = normalizedName;
+                        option.textContent = displayName;
+                        option.dataset.display = displayName;
+
+                        if (!selectionApplied && normalizedSelectedValue && normalizedName === normalizedSelectedValue) {
+                            option.selected = true;
+                            selectionApplied = true;
+                        } else if (!selectionApplied && !normalizedSelectedValue && normalizedSelectedDisplay && normalizedName === normalizedSelectedDisplay) {
+                            option.selected = true;
+                            selectionApplied = true;
+                        }
+
+                        fragment.appendChild(option);
+                    });
+
+                if (!selectionApplied && normalizedSelectedValue) {
+                    const fallbackOption = document.createElement('option');
+                    fallbackOption.value = normalizedSelectedValue;
+                    fallbackOption.textContent = selectedDisplay || normalizedSelectedValue;
+                    fallbackOption.dataset.display = selectedDisplay || normalizedSelectedValue;
+                    fallbackOption.selected = true;
+                    fragment.appendChild(fallbackOption);
+                }
+
+                municipioSelect.innerHTML = '';
+                municipioSelect.appendChild(fragment);
+                municipioSelect.disabled = false;
+                syncMunicipioDisplay();
+            };
+
+            const loadMunicipios = async function (uf, selectedValue, selectedDisplay) {
+                if (!municipioSelect) {
+                    return;
+                }
+
+                const resolvedUf = typeof uf === 'string' ? uf.trim().toUpperCase() : '';
+                const normalizedSelectedValue = selectedValue ? normalizeMunicipioValue(selectedValue) : '';
+                const selectedDisplayValue = selectedDisplay ? String(selectedDisplay) : '';
+
+                if (!resolvedUf) {
+                    resetMunicipioSelect(true);
+                    return;
+                }
+
+                if (resolvedUf === lastMunicipioUf && municipioSelect.dataset.loadedUf === resolvedUf) {
+                    municipioSelect.disabled = false;
+                    if (normalizedSelectedValue) {
+                        municipioSelect.value = normalizedSelectedValue;
+                    } else {
+                        municipioSelect.value = '';
+                    }
+                    syncMunicipioDisplay();
+                    return;
+                }
+
+                municipioRequestId += 1;
+                const currentId = municipioRequestId;
+
+                municipioSelect.disabled = true;
+                municipioSelect.classList.add('opacity-60');
+                if (municipioDisplayInput) {
+                    municipioDisplayInput.value = '';
+                }
+
+                try {
+                    const response = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + resolvedUf + '/municipios');
+                    if (!response.ok) {
+                        throw new Error('Resposta HTTP invalida');
+                    }
+
+                    const lista = await response.json();
+                    if (currentId !== municipioRequestId) {
+                        return;
+                    }
+
+                    lastMunicipioUf = resolvedUf;
+                    populateMunicipios(lista, normalizedSelectedValue, selectedDisplayValue);
+                    municipioSelect.dataset.loadedUf = resolvedUf;
+                } catch (error) {
+                    console.error('Falha ao carregar municipios', error);
+                    resetMunicipioSelect(false);
+                    if (normalizedSelectedValue) {
+                        const fallbackOption = document.createElement('option');
+                        fallbackOption.value = normalizedSelectedValue;
+                        fallbackOption.textContent = selectedDisplayValue || normalizedSelectedValue;
+                        fallbackOption.dataset.display = selectedDisplayValue || normalizedSelectedValue;
+                        fallbackOption.selected = true;
+                        municipioSelect.appendChild(fallbackOption);
+                    }
+                    syncMunicipioDisplay();
+                } finally {
+                    municipioSelect.classList.remove('opacity-60');
+                }
+            };
+
+            if (municipioSelect) {
+                const initialShouldDisable = !(ufSelect && ufSelect.value);
+                resetMunicipioSelect(initialShouldDisable);
+
+                if (ufSelect && ufSelect.value) {
+                    const initialMunicipioValue = municipioSelect.dataset.initialMunicipio || '';
+                    const initialMunicipioDisplay = municipioSelect.dataset.initialDisplay || '';
+                    loadMunicipios(ufSelect.value, initialMunicipioValue, initialMunicipioDisplay).finally(function () {
+                        municipioSelect.dataset.initialMunicipio = '';
+                        municipioSelect.dataset.initialDisplay = '';
+                    });
+                }
+            }
+
+            if (ufSelect && municipioSelect) {
+                ufSelect.addEventListener('change', function () {
+                    municipioSelect.dataset.initialMunicipio = '';
+                    municipioSelect.dataset.initialDisplay = '';
+                    loadMunicipios(ufSelect.value, '', '');
+                });
+            }
+
+            if (municipioSelect) {
+                municipioSelect.addEventListener('change', function () {
+                    syncMunicipioDisplay();
+                });
+            }
+
+            if (searchForm && municipioSelect) {
+                searchForm.addEventListener('submit', function () {
+                    syncMunicipioDisplay();
+                });
+            }
 
             if (cnaeInput) {
                 cnaeInput.addEventListener('input', function () {
@@ -684,7 +950,7 @@ renderPageStart('Buscar Leads', 'buscar');
 
             const historyButtons = document.querySelectorAll('.history-apply');
             historyButtons.forEach(function (button) {
-                button.addEventListener('click', function () {
+                button.addEventListener('click', async function () {
                     if (!searchForm) {
                         return;
                     }
@@ -740,9 +1006,17 @@ renderPageStart('Buscar Leads', 'buscar');
                         }
                     };
 
+                    const ufValor = Array.isArray(filtros.uf) ? (filtros.uf[0] ?? '') : (filtros.uf ?? '');
+                    const municipioValor = Array.isArray(filtros.municipio) ? (filtros.municipio[0] ?? '') : (filtros.municipio ?? '');
+                    const municipioDisplayValor = filtros.municipio_display ?? '';
+
                     setFieldValue('cnae', filtros.cnae);
-                    setFieldValue('uf', filtros.uf);
-                    setFieldValue('municipio', filtros.municipio);
+                    setFieldValue('uf', ufValor);
+                    setFieldValue('municipio_display', municipioDisplayValor);
+                    await loadMunicipios(ufValor, municipioValor, municipioDisplayValor);
+                    if (municipioDisplayInput && municipioDisplayValor && municipioDisplayInput.value === '') {
+                        municipioDisplayInput.value = municipioDisplayValor;
+                    }
                     setFieldValue('quantidade', filtros.quantidade);
                     setFieldValue('pagina', filtros.pagina);
                     setFieldValue('capital_social_minimo', filtros.capital_social_minimo);
@@ -772,6 +1046,11 @@ renderPageStart('Buscar Leads', 'buscar');
 
                     const situacaoValor = filtros.situacao !== undefined ? filtros.situacao : filtros.situacao_cadastral;
                     applySituacao(situacaoValor);
+
+                    if (!municipioValor && municipioSelect) {
+                        municipioSelect.value = '';
+                        syncMunicipioDisplay();
+                    }
 
                     if (typeof searchForm.requestSubmit === 'function') {
                         searchForm.requestSubmit();
