@@ -15,6 +15,7 @@ node_modules/
 gac-leads/
 *.log
 *.cache
+storage/cache/
 
 # OS metadata
 Thumbs.db

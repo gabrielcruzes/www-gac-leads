@@ -97,8 +97,6 @@ if (!function_exists('normalizeMunicipio')) {
             $converted = $trimmed;
         }
 
-        $converted = str_replace(["'", '’', '`', '´'], ' ', $converted);
-
         $sanitized = preg_replace('/[^A-Za-z0-9\s-]/', '', $converted);
         if ($sanitized === null) {
             $sanitized = $converted;
@@ -742,8 +740,6 @@ renderPageStart('Buscar Leads', 'buscar');
                 if (typeof result.normalize === 'function') {
                     result = result.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                 }
-
-                result = result.replace(/['`´’]/g, ' ');
                 result = result.replace(/[^A-Za-z0-9\s-]/g, '');
                 result = result.replace(/\s+/g, ' ');
 
@@ -875,7 +871,7 @@ renderPageStart('Buscar Leads', 'buscar');
                 }
 
                 try {
-                    const response = await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/' + resolvedUf + '/municipios');
+                    const response = await fetch('api/municipios.php?uf=' + encodeURIComponent(resolvedUf));
                     if (!response.ok) {
                         throw new Error('Resposta HTTP invalida');
                     }
@@ -1171,6 +1167,11 @@ renderPageStart('Buscar Leads', 'buscar');
 <?php endif; ?>
 <?php
 renderPageEnd();
+
+
+
+
+
 
 
 
