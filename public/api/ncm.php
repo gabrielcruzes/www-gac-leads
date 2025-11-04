@@ -48,6 +48,80 @@ function normalizeString(string $value): string
 }
 
 /**
+ * Executa chamada HTTP para a BrazilAPI retornando array decodificado.
+ *
+ * @return array<int,array<string,mixed>>|null
+ */
+function fetchBrazilApiCatalog(string $url): ?array
+{
+    $headers = [
+        'Accept: application/json',
+        'User-Agent: GAC-Leads/1.0',
+    ];
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+        ]);
+        $body = curl_exec($ch);
+        if ($body === false) {
+            curl_close($ch);
+            return null;
+        }
+
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+
+        if ($status >= 400) {
+            return null;
+        }
+
+        $decoded = json_decode($body, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    global $http_response_header;
+
+    $http_response_header = [];
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'timeout' => 15,
+            'header' => implode("\r\n", $headers) . "\r\n",
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
+
+    $body = @file_get_contents($url, false, $context);
+    if ($body === false) {
+        return null;
+    }
+
+    $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
+    if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
+        return null;
+    }
+    $status = (int) $statusMatch[1];
+    if ($status >= 400) {
+        return null;
+    }
+
+    $decoded = json_decode($body, true);
+
+    return is_array($decoded) ? $decoded : null;
+}
+
+/**
  * Carrega o catalogo de NCM da BrazilAPI (com cache local).
  *
  * @return array<int,array<string,mixed>>
@@ -64,32 +138,14 @@ function loadNcmCatalog(string $cacheFile, int $cacheTtl): array
         }
     }
 
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'GET',
-            'timeout' => 10,
-            'header' => "Accept: application/json\r\nUser-Agent: GAC-Leads/1.0\r\n",
-        ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-        ],
-    ]);
-
-    $remoteUrl = 'https://brasilapi.com.br/api/ncm/v1';
-    $response = @file_get_contents($remoteUrl, false, $context);
-    if ($response === false) {
+    $catalog = fetchBrazilApiCatalog('https://brasilapi.com.br/api/ncm/v1');
+    if ($catalog === null) {
         return [];
     }
 
-    $decoded = json_decode($response, true);
-    if (!is_array($decoded)) {
-        return [];
-    }
+    @file_put_contents($cacheFile, json_encode($catalog, JSON_UNESCAPED_UNICODE));
 
-    @file_put_contents($cacheFile, json_encode($decoded, JSON_UNESCAPED_UNICODE));
-
-    return $decoded;
+    return $catalog;
 }
 
 $catalog = loadNcmCatalog($cacheFile, $cacheTtl);
