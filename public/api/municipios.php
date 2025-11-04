@@ -183,40 +183,81 @@ function municipioFallbackList(string $uf): array
     }, $list);
 }
 
-function loadStateIdMap(string $cacheDir, int $ttl): array
+function loadStateIdMap(): array
 {
-    $baseMap = BRAZIL_STATE_ID_MAP;
-    $cacheFile = $cacheDir . DIRECTORY_SEPARATOR . 'brazilapi-uf-map.json';
-
-    if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $ttl)) {
-        $cached = @file_get_contents($cacheFile);
-        if ($cached !== false) {
-            $decoded = json_decode($cached, true);
-            if (is_array($decoded) && !empty($decoded)) {
-                return array_merge($baseMap, $decoded);
-            }
-        }
-    }
-
-    $result = brasilApiGet('https://brasilapi.com.br/api/ibge/uf/v1');
-    if ($result === null || $result['status'] >= 400 || !is_array($result['body'])) {
-        return $baseMap;
-    }
-
-    $map = $baseMap;
-    foreach ($result['body'] as $state) {
-        if (!isset($state['sigla'], $state['id'])) {
-            continue;
-        }
-        $map[strtoupper($state['sigla'])] = (int) $state['id'];
-    }
-
-    @file_put_contents($cacheFile, json_encode($map, JSON_UNESCAPED_UNICODE));
-
-    return $map;
+    return BRAZIL_STATE_ID_MAP;
 }
 
-$stateIdMap = loadStateIdMap($cacheDir, $statesCacheTtl);
+/**
+ * Recupera municipios diretamente da API oficial do IBGE.
+ *
+ * @return array<int,array<string,mixed>>|null
+ */
+function ibgeGetMunicipios(string $uf): ?array
+{
+    $url = 'https://servicodados.ibge.gov.br/api/v1/localidades/estados/' . rawurlencode($uf) . '/municipios';
+
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'User-Agent: GAC-Leads/1.0',
+            ],
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
+        ]);
+        $body = curl_exec($ch);
+        if ($body === false) {
+            curl_close($ch);
+            return null;
+        }
+        $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+        if ($status >= 400) {
+            return null;
+        }
+    } else {
+        global $http_response_header;
+
+        $http_response_header = [];
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 15,
+                'header' => "Accept: application/json\r\nUser-Agent: GAC-Leads/1.0\r\n",
+                'protocol_version' => 1.1,
+            ],
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+            ],
+        ]);
+
+        $body = @file_get_contents($url, false, $context);
+        if ($body === false) {
+            return null;
+        }
+
+        $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
+        if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
+            return null;
+        }
+        if ((int) $statusMatch[1] >= 400) {
+            return null;
+        }
+    }
+
+    $decoded = json_decode($body ?? '', true);
+
+    return is_array($decoded) ? $decoded : null;
+}
+
+$stateIdMap = loadStateIdMap();
 $stateId = $stateIdMap[$uf] ?? null;
 
 $cities = null;
@@ -255,8 +296,16 @@ if ($stateId !== null) {
 }
 
 if ($cities === null) {
-    $fallbackResponse = brasilApiGet('https://brasilapi.com.br/api/ibge/municipios/v1/' . rawurlencode($uf));
-    if ($fallbackResponse === null || $fallbackResponse['status'] >= 400 || !is_array($fallbackResponse['body'])) {
+    $ibgeMunicipios = ibgeGetMunicipios($uf);
+    if (is_array($ibgeMunicipios) && !empty($ibgeMunicipios)) {
+        $cities = array_map(static function ($entry) {
+            $name = is_array($entry) ? ($entry['nome'] ?? $entry['name'] ?? null) : (is_string($entry) ? $entry : null);
+            return [
+                'id' => is_array($entry) ? ($entry['codigo_ibge'] ?? ($entry['id'] ?? null)) : null,
+                'nome' => $name,
+            ];
+        }, $ibgeMunicipios);
+    } else {
         $fallbackCities = municipioFallbackList($uf);
         if (!empty($fallbackCities)) {
             $cities = $fallbackCities;
@@ -266,20 +315,6 @@ if ($cities === null) {
             echo json_encode(['error' => 'Nao foi possivel consultar os municipios no momento.']);
             exit;
         }
-    } else {
-        $cities = array_map(static function ($entry) {
-            $name = null;
-            if (is_array($entry)) {
-                $name = $entry['nome'] ?? $entry['name'] ?? null;
-            } elseif (is_string($entry)) {
-                $name = $entry;
-            }
-
-            return [
-                'id' => is_array($entry) ? ($entry['codigo_ibge'] ?? ($entry['id'] ?? null)) : null,
-                'nome' => $name,
-            ];
-        }, $fallbackResponse['body']);
     }
 }
 
