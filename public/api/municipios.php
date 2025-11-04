@@ -9,6 +9,36 @@
  * As respostas sao cacheadas em disco para reduzir latencia e rate limiting.
  */
 
+const BRAZIL_STATE_ID_MAP = [
+    'RO' => 11,
+    'AC' => 12,
+    'AM' => 13,
+    'RR' => 14,
+    'PA' => 15,
+    'AP' => 16,
+    'TO' => 17,
+    'MA' => 21,
+    'PI' => 22,
+    'CE' => 23,
+    'RN' => 24,
+    'PB' => 25,
+    'PE' => 26,
+    'AL' => 27,
+    'SE' => 28,
+    'BA' => 29,
+    'MG' => 31,
+    'ES' => 32,
+    'RJ' => 33,
+    'SP' => 35,
+    'PR' => 41,
+    'SC' => 42,
+    'RS' => 43,
+    'MS' => 50,
+    'MT' => 51,
+    'GO' => 52,
+    'DF' => 53,
+];
+
 $uf = strtoupper(trim($_GET['uf'] ?? ''));
 
 if (!preg_match('/^[A-Z]{2}$/', $uf)) {
@@ -59,6 +89,7 @@ function brasilApiGet(string $url): ?array
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
         ]);
         $body = curl_exec($ch);
         if ($body === false) {
@@ -77,6 +108,7 @@ function brasilApiGet(string $url): ?array
                 'method' => 'GET',
                 'timeout' => 10,
                 'header' => implode("\r\n", $headers) . "\r\n",
+                'protocol_version' => 1.1,
             ],
             'ssl' => [
                 'verify_peer' => true,
@@ -90,7 +122,7 @@ function brasilApiGet(string $url): ?array
         }
 
         $statusLine = $http_response_header[0] ?? 'HTTP/1.1 500';
-        if (!preg_match('/\s(\d{3})\s/', $statusLine, $statusMatch)) {
+        if (!preg_match('/\\s(\\d{3})\\s/', $statusLine, $statusMatch)) {
             return null;
         }
         $status = (int) $statusMatch[1];
@@ -104,26 +136,74 @@ function brasilApiGet(string $url): ?array
     ];
 }
 
+/**
+ * Retorna um conjunto minimo de municipios para uso offline por UF.
+ *
+ * @return array<int,array<string,string|null>>
+ */
+function municipioFallbackList(string $uf): array
+{
+    static $fallback = [
+        'AC' => ['Rio Branco', 'Cruzeiro do Sul', 'Sena Madureira'],
+        'AL' => ['Maceio', 'Arapiraca', 'Palmeira dos Indios'],
+        'AP' => ['Macapa', 'Santana', 'Laranjal do Jari'],
+        'AM' => ['Manaus', 'Parintins', 'Itacoatiara'],
+        'BA' => ['Salvador', 'Feira de Santana', 'Vitoria da Conquista'],
+        'CE' => ['Fortaleza', 'Juazeiro do Norte', 'Sobral'],
+        'DF' => ['Brasilia', 'Ceilandia', 'Taguatinga'],
+        'ES' => ['Vitoria', 'Vila Velha', 'Serra'],
+        'GO' => ['Goiania', 'Anapolis', 'Aparecida de Goiania'],
+        'MA' => ['Sao Luis', 'Imperatriz', 'Caxias'],
+        'MT' => ['Cuiaba', 'Varzea Grande', 'Rondonopolis'],
+        'MS' => ['Campo Grande', 'Dourados', 'Tres Lagoas'],
+        'MG' => ['Belo Horizonte', 'Uberlandia', 'Contagem'],
+        'PA' => ['Belem', 'Ananindeua', 'Santarem'],
+        'PB' => ['Joao Pessoa', 'Campina Grande', 'Patos'],
+        'PR' => ['Curitiba', 'Londrina', 'Maringa'],
+        'PE' => ['Recife', 'Olinda', 'Caruaru'],
+        'PI' => ['Teresina', 'Parnaiba', 'Picos'],
+        'RJ' => ['Rio de Janeiro', 'Niteroi', 'Campos dos Goytacazes'],
+        'RN' => ['Natal', 'Mossoro', 'Parnamirim'],
+        'RS' => ['Porto Alegre', 'Caxias do Sul', 'Pelotas'],
+        'RO' => ['Porto Velho', 'Ji-Parana', 'Ariquemes'],
+        'RR' => ['Boa Vista', 'Rorainopolis', 'Caracarai'],
+        'SC' => ['Florianopolis', 'Joinville', 'Blumenau'],
+        'SP' => ['Sao Paulo', 'Campinas', 'Santos'],
+        'SE' => ['Aracaju', 'Nossa Senhora do Socorro', 'Itabaiana'],
+        'TO' => ['Palmas', 'Araguaina', 'Gurupi'],
+    ];
+
+    $list = $fallback[$uf] ?? [];
+
+    return array_map(static function (string $name): array {
+        return [
+            'id' => null,
+            'nome' => $name,
+        ];
+    }, $list);
+}
+
 function loadStateIdMap(string $cacheDir, int $ttl): array
 {
+    $baseMap = BRAZIL_STATE_ID_MAP;
     $cacheFile = $cacheDir . DIRECTORY_SEPARATOR . 'brazilapi-uf-map.json';
 
     if (is_file($cacheFile) && (time() - filemtime($cacheFile) < $ttl)) {
         $cached = @file_get_contents($cacheFile);
         if ($cached !== false) {
             $decoded = json_decode($cached, true);
-            if (is_array($decoded)) {
-                return $decoded;
+            if (is_array($decoded) && !empty($decoded)) {
+                return array_merge($baseMap, $decoded);
             }
         }
     }
 
     $result = brasilApiGet('https://brasilapi.com.br/api/ibge/uf/v1');
     if ($result === null || $result['status'] >= 400 || !is_array($result['body'])) {
-        return [];
+        return $baseMap;
     }
 
-    $map = [];
+    $map = $baseMap;
     foreach ($result['body'] as $state) {
         if (!isset($state['sigla'], $state['id'])) {
             continue;
@@ -177,25 +257,30 @@ if ($stateId !== null) {
 if ($cities === null) {
     $fallbackResponse = brasilApiGet('https://brasilapi.com.br/api/ibge/municipios/v1/' . rawurlencode($uf));
     if ($fallbackResponse === null || $fallbackResponse['status'] >= 400 || !is_array($fallbackResponse['body'])) {
-        http_response_code(502);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Nao foi possivel consultar os municipios no momento.']);
-        exit;
-    }
-
-    $cities = array_map(static function ($entry) {
-        $name = null;
-        if (is_array($entry)) {
-            $name = $entry['nome'] ?? $entry['name'] ?? null;
-        } elseif (is_string($entry)) {
-            $name = $entry;
+        $fallbackCities = municipioFallbackList($uf);
+        if (!empty($fallbackCities)) {
+            $cities = $fallbackCities;
+        } else {
+            http_response_code(502);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => 'Nao foi possivel consultar os municipios no momento.']);
+            exit;
         }
+    } else {
+        $cities = array_map(static function ($entry) {
+            $name = null;
+            if (is_array($entry)) {
+                $name = $entry['nome'] ?? $entry['name'] ?? null;
+            } elseif (is_string($entry)) {
+                $name = $entry;
+            }
 
-        return [
-            'id' => is_array($entry) ? ($entry['codigo_ibge'] ?? ($entry['id'] ?? null)) : null,
-            'nome' => $name,
-        ];
-    }, $fallbackResponse['body']);
+            return [
+                'id' => is_array($entry) ? ($entry['codigo_ibge'] ?? ($entry['id'] ?? null)) : null,
+                'nome' => $name,
+            ];
+        }, $fallbackResponse['body']);
+    }
 }
 
 $cities = array_values(array_filter($cities, static function ($entry) {

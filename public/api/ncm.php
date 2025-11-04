@@ -68,6 +68,7 @@ function fetchBrazilApiCatalog(string $url): ?array
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
         ]);
         $body = curl_exec($ch);
         if ($body === false) {
@@ -95,6 +96,7 @@ function fetchBrazilApiCatalog(string $url): ?array
             'method' => 'GET',
             'timeout' => 15,
             'header' => implode("\r\n", $headers) . "\r\n",
+            'protocol_version' => 1.1,
         ],
         'ssl' => [
             'verify_peer' => true,
@@ -122,6 +124,53 @@ function fetchBrazilApiCatalog(string $url): ?array
 }
 
 /**
+ * Catálogo minimo para fallback quando a BrazilAPI estiver indisponivel.
+ *
+ * @return array<int,array<string,string>>
+ */
+function ncmFallbackCatalog(): array
+{
+    return [
+        [
+            'codigo' => '3305.10.00',
+            'descricao' => '- Xampus',
+            'data_inicio' => '2022-04-01',
+            'data_fim' => '9999-12-31',
+            'tipo_ato' => 'Res Camex',
+            'numero_ato' => '000272',
+            'ano_ato' => '2021',
+        ],
+        [
+            'codigo' => '3304.99.90',
+            'descricao' => '- Outros produtos de beleza ou de maquiagem preparados',
+            'data_inicio' => '2022-04-01',
+            'data_fim' => '9999-12-31',
+            'tipo_ato' => 'Res Camex',
+            'numero_ato' => '000272',
+            'ano_ato' => '2021',
+        ],
+        [
+            'codigo' => '2106.90.10',
+            'descricao' => '- Suplementos alimentares',
+            'data_inicio' => '2022-04-01',
+            'data_fim' => '9999-12-31',
+            'tipo_ato' => 'Res Camex',
+            'numero_ato' => '000272',
+            'ano_ato' => '2021',
+        ],
+        [
+            'codigo' => '8504.40.40',
+            'descricao' => '- Carregadores de baterias para telefones moveis',
+            'data_inicio' => '2022-04-01',
+            'data_fim' => '9999-12-31',
+            'tipo_ato' => 'Res Camex',
+            'numero_ato' => '000272',
+            'ano_ato' => '2021',
+        ],
+    ];
+}
+
+/**
  * Carrega o catalogo de NCM da BrazilAPI (com cache local).
  *
  * @return array<int,array<string,mixed>>
@@ -139,7 +188,12 @@ function loadNcmCatalog(string $cacheFile, int $cacheTtl): array
     }
 
     $catalog = fetchBrazilApiCatalog('https://brasilapi.com.br/api/ncm/v1');
-    if ($catalog === null) {
+    if ($catalog === null || !is_array($catalog) || count($catalog) === 0) {
+        $fallback = ncmFallbackCatalog();
+        if (!empty($fallback)) {
+            @file_put_contents($cacheFile, json_encode($fallback, JSON_UNESCAPED_UNICODE));
+            return $fallback;
+        }
         return [];
     }
 

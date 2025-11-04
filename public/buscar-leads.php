@@ -113,6 +113,7 @@ if (!function_exists('normalizeMunicipio')) {
 
 $formState = [
     'cnae' => '',
+    'ncm' => '',
     'uf' => '',
     'municipio' => '',
     'municipio_display' => '',
@@ -155,6 +156,7 @@ unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cnaeInput = trim($_POST['cnae'] ?? '');
     $formState['cnae'] = preg_replace('/\D/', '', $cnaeInput);
+    $formState['ncm'] = trim($_POST['ncm'] ?? '');
     $ufRecebida = strtoupper(trim($_POST['uf'] ?? ''));
     $formState['uf'] = $ufRecebida === '' ? '' : $ufRecebida;
     $municipioRecebido = trim((string) ($_POST['municipio'] ?? ''));
@@ -262,6 +264,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $filtros['cnae'] = $formState['cnae'];
         }
 
+        $ncmFiltro = normalizeListField($formState['ncm']);
+        if ($ncmFiltro) {
+            $ncmSanitized = array_map(static fn($item) => preg_replace('/\D+/', '', $item), $ncmFiltro);
+            $ncmSanitized = array_values(array_filter($ncmSanitized, static fn($item) => $item !== ''));
+            if ($ncmSanitized) {
+                $filtros['ncm'] = $ncmSanitized;
+            }
+        }
+        if ($formState['ncm'] !== '') {
+            $filtros['ncm_display'] = $formState['ncm'];
+        }
+
         if ($formState['uf'] !== '') {
             $filtros['uf'] = $formState['uf'];
         }
@@ -365,6 +379,11 @@ renderPageStart('Buscar Leads', 'buscar');
                        value="<?php echo htmlspecialchars($formState['cnae']); ?>"
                        class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
                 <p class="text-xs text-slate-400 mt-1">Informe os 7 digitos do CNAE somente se desejar filtrar pelo segmento.</p>
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-slate-600 mb-1">NCM</label>
+                <input type="text" name="ncm" id="search-ncm" value="<?php echo htmlspecialchars($formState['ncm']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Opcional - ex.: 3305.10.00">
+                <p class="text-xs text-slate-400 mt-1">Adicione um ou mais codigos NCM separados por virgula. Use a consulta de NCM abaixo para buscar pela descricao.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1">UF</label>
@@ -556,6 +575,10 @@ renderPageStart('Buscar Leads', 'buscar');
                             if ($historicoMunicipioDisplay === '' && $historicoMunicipio !== '') {
                                 $historicoMunicipioDisplay = $historicoMunicipio;
                             }
+                            $historicoNcm = $filtroRegistro['ncm_display'] ?? '';
+                            if ($historicoNcm === '' && !empty($filtroRegistro['ncm'])) {
+                                $historicoNcm = is_array($filtroRegistro['ncm']) ? implode(', ', $filtroRegistro['ncm']) : (string) $filtroRegistro['ncm'];
+                            }
                             $historicoQuantidade = $filtroRegistro['quantidade'] ?? '';
                             $historicoSituacao = $filtroRegistro['situacao'] ?? ($filtroRegistro['situacao_cadastral'] ?? 'ATIVA');
                             if (is_array($historicoSituacao)) {
@@ -569,6 +592,8 @@ renderPageStart('Buscar Leads', 'buscar');
                             $dadosReaplicar['uf'] = $filtroRegistro['uf'] ?? '';
                             $dadosReaplicar['municipio'] = $historicoMunicipio;
                             $dadosReaplicar['municipio_display'] = $historicoMunicipioDisplay;
+                            $dadosReaplicar['ncm_display'] = $historicoNcm;
+                            $dadosReaplicar['ncm'] = $historicoNcm;
                             $dadosReaplicar['quantidade'] = $historicoQuantidade;
                             $dadosReaplicar['pagina'] = $filtroRegistro['pagina'] ?? 1;
                             $dadosReaplicar['situacao'] = $historicoSituacao;
@@ -583,6 +608,7 @@ renderPageStart('Buscar Leads', 'buscar');
                                     <p class="text-xs text-slate-500">
                                         UF: <?php echo htmlspecialchars($historicoUf !== '' ? $historicoUf : '-'); ?> |
                                         Municipio: <?php echo htmlspecialchars($historicoMunicipioDisplay !== '' ? $historicoMunicipioDisplay : '-'); ?> |
+                                        NCM: <?php echo htmlspecialchars($historicoNcm !== '' ? $historicoNcm : '-'); ?> |
                                         Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?>
                                     </p>
                                 </div>
@@ -741,6 +767,7 @@ renderPageStart('Buscar Leads', 'buscar');
         document.addEventListener('DOMContentLoaded', function () {
             const searchForm = document.getElementById('lead-search-form');
             const cnaeInput = document.getElementById('search-cnae');
+            const ncmFilterField = document.getElementById('search-ncm');
             const ufSelect = document.getElementById('search-uf');
             const municipioSelect = document.getElementById('search-municipio');
             const municipioDisplayInput = document.getElementById('search-municipio-display');
@@ -1009,7 +1036,12 @@ renderPageStart('Buscar Leads', 'buscar');
                             return;
                         }
 
-                        const resolved = value !== undefined && value !== null ? value : '';
+                        let resolved = '';
+                        if (Array.isArray(value)) {
+                            resolved = value.join(', ');
+                        } else if (value !== undefined && value !== null) {
+                            resolved = String(value);
+                        }
                         field.value = resolved;
                     };
 
@@ -1043,8 +1075,10 @@ renderPageStart('Buscar Leads', 'buscar');
                     const ufValor = Array.isArray(filtros.uf) ? (filtros.uf[0] ?? '') : (filtros.uf ?? '');
                     const municipioValor = Array.isArray(filtros.municipio) ? (filtros.municipio[0] ?? '') : (filtros.municipio ?? '');
                     const municipioDisplayValor = filtros.municipio_display ?? '';
+                    const ncmValor = filtros.ncm_display ?? filtros.ncm;
 
                     setFieldValue('cnae', filtros.cnae);
+                    setFieldValue('ncm', ncmValor);
                     setFieldValue('uf', ufValor);
                     setFieldValue('municipio_display', municipioDisplayValor);
                     await loadMunicipios(ufValor, municipioValor, municipioDisplayValor);
@@ -1243,7 +1277,7 @@ renderPageStart('Buscar Leads', 'buscar');
                             '<td class="px-4 py-2 text-sm text-slate-600">' + escapeHtml(description) + '</td>' +
                             '<td class="px-4 py-2 text-xs text-slate-500">' + escapeHtml(vigencia) + '</td>' +
                             '<td class="px-4 py-2 text-right">' +
-                                '<button type="button" class="ncm-copy-btn text-blue-600 hover:text-blue-700 text-xs font-medium" data-ncm-code="' + escapeHtml(code) + '" data-ncm-description="' + escapeHtml(description) + '">Copiar codigo</button>' +
+                                '<button type="button" class="ncm-add-btn text-blue-600 hover:text-blue-700 text-xs font-medium" data-ncm-code="' + escapeHtml(code) + '" data-ncm-description="' + escapeHtml(description) + '">Adicionar ao filtro</button>' +
                             '</td>' +
                         '</tr>'
                     );
@@ -1359,55 +1393,33 @@ renderPageStart('Buscar Leads', 'buscar');
 
             if (ncmResults) {
                 ncmResults.addEventListener('click', function (event) {
-                    const target = event.target;
-                    if (!target) {
-                        return;
-                    }
-                    const button = target.closest('.ncm-copy-btn');
+                    const button = event.target ? event.target.closest('.ncm-add-btn') : null;
                     if (!button) {
                         return;
                     }
-                    const code = button.getAttribute('data-ncm-code') || '';
+
+                    const code = (button.getAttribute('data-ncm-code') || '').trim();
                     if (!code) {
-                        setNcmStatus('Codigo NCM nao disponivel para copia.', true);
+                        setNcmStatus('Codigo NCM nao disponivel.', true);
                         return;
                     }
-                    const copyText = code;
 
-                    const onCopySuccess = function () {
-                        setNcmStatus('Codigo ' + code + ' copiado para a area de transferencia.', false);
-                    };
+                    if (ncmFilterField) {
+                        const existingList = ncmFilterField.value
+                            ? ncmFilterField.value.split(/[,;\s]+/).map(function (item) { return item.trim(); }).filter(Boolean)
+                            : [];
+                        if (!existingList.includes(code)) {
+                            existingList.push(code);
+                        }
+                        ncmFilterField.value = existingList.join(', ');
+                    }
 
-                    const onCopyFailure = function () {
-                        setNcmStatus('Nao foi possivel copiar automaticamente. Copie manualmente: ' + code, true);
-                    };
+                    setNcmStatus('Codigo ' + code + ' adicionado ao campo NCM.', false);
 
                     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-                        navigator.clipboard.writeText(copyText).then(onCopySuccess).catch(function (clipboardError) {
-                            console.error('Erro ao copiar NCM', clipboardError);
-                            onCopyFailure();
+                        navigator.clipboard.writeText(code).catch(function (error) {
+                            console.warn('Nao foi possivel copiar automaticamente o NCM', error);
                         });
-                    } else {
-                        const tempInput = document.createElement('input');
-                        tempInput.type = 'text';
-                        tempInput.value = copyText;
-                        tempInput.setAttribute('readonly', '');
-                        tempInput.style.position = 'absolute';
-                        tempInput.style.left = '-9999px';
-                        document.body.appendChild(tempInput);
-                        tempInput.select();
-                        try {
-                            const succeeded = document.execCommand('copy');
-                            if (succeeded) {
-                                onCopySuccess();
-                            } else {
-                                onCopyFailure();
-                            }
-                        } catch (error) {
-                            console.error('execCommand copy NCM', error);
-                            onCopyFailure();
-                        }
-                        document.body.removeChild(tempInput);
                     }
                 });
             }
