@@ -17,6 +17,13 @@ function renderPageStart(string $title, string $active = ''): void
 {
     $user = Auth::user();
     $userName = $user ? $user['name'] : 'Usuário';
+    $navLinks = [
+        ['href' => 'index.php', 'label' => 'Dashboard', 'key' => 'dashboard'],
+        ['href' => 'buscar-leads.php', 'label' => 'Buscar Leads', 'key' => 'buscar'],
+        ['href' => 'listas.php', 'label' => 'Listas', 'key' => 'listas'],
+        ['href' => 'comprar-creditos.php', 'label' => 'Comprar Créditos', 'key' => 'creditos'],
+        ['href' => 'historico-exportacoes.php', 'label' => 'Exportações', 'key' => 'historico'],
+    ];
     ?>
     <!DOCTYPE html>
     <html lang="pt-BR">
@@ -44,18 +51,71 @@ function renderPageStart(string $title, string $active = ''): void
                         <span class="text-xl font-semibold text-blue-700 hidden sm:inline">GAC Leads</span>
                     </a>
                 </div>
-                <nav class="flex items-center gap-4 text-sm font-medium">
-                    <a href="index.php" class="px-3 py-2 rounded-lg <?php echo $active === 'dashboard' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Dashboard</a>
-                    <a href="buscar-leads.php" class="px-3 py-2 rounded-lg <?php echo $active === 'buscar' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Buscar Leads</a>
-                    <a href="listas.php" class="px-3 py-2 rounded-lg <?php echo $active === 'listas' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Listas</a>
-                    <a href="comprar-creditos.php" class="px-3 py-2 rounded-lg <?php echo $active === 'creditos' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Comprar Créditos</a>
-                    <a href="historico-exportacoes.php" class="px-3 py-2 rounded-lg <?php echo $active === 'historico' ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>">Exportações</a>
-                </nav>
-                <div class="flex items-center gap-3">
-                    <span class="text-sm text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
-                    <a href="logout.php" class="text-sm text-slate-500 hover:text-blue-600">Sair</a>
+                <div class="flex items-center gap-4">
+                    <button
+                        type="button"
+                        class="md:hidden inline-flex items-center justify-center rounded-lg border border-slate-200 p-2 text-blue-700 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        id="mobileMenuButton"
+                        aria-label="Abrir menu"
+                        aria-expanded="false"
+                    >
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                    <nav class="hidden md:flex items-center gap-4 text-sm font-medium">
+                        <?php foreach ($navLinks as $link): ?>
+                            <?php $isActive = $active === $link['key']; ?>
+                            <a
+                                href="<?php echo $link['href']; ?>"
+                                class="px-3 py-2 rounded-lg <?php echo $isActive ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>"
+                            >
+                                <?php echo $link['label']; ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </nav>
+                    <div class="hidden md:flex items-center gap-3">
+                        <span class="text-sm text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
+                        <a href="logout.php" class="text-sm text-slate-500 hover:text-blue-600">Sair</a>
+                    </div>
                 </div>
             </div>
+            <div id="mobileMenu" class="md:hidden hidden border-t border-slate-200 bg-white">
+                <nav class="flex flex-col px-6 py-4 text-sm font-medium">
+                    <?php foreach ($navLinks as $link): ?>
+                        <?php $isActive = $active === $link['key']; ?>
+                        <a
+                            href="<?php echo $link['href']; ?>"
+                            class="rounded-lg px-3 py-2 <?php echo $isActive ? 'bg-blue-600 text-white' : 'text-blue-700 hover:bg-blue-50'; ?>"
+                        >
+                            <?php echo $link['label']; ?>
+                        </a>
+                    <?php endforeach; ?>
+                </nav>
+                <div class="border-t border-slate-200 px-6 py-4 flex items-center justify-between text-sm">
+                    <span class="text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
+                    <a href="logout.php" class="text-slate-500 hover:text-blue-600">Sair</a>
+                </div>
+            </div>
+            <script>
+                document.addEventListener('DOMContentLoaded', function () {
+                    var menuButton = document.getElementById('mobileMenuButton');
+                    var mobileMenu = document.getElementById('mobileMenu');
+                    if (!menuButton || !mobileMenu) {
+                        return;
+                    }
+                    menuButton.addEventListener('click', function () {
+                        var isHidden = mobileMenu.classList.toggle('hidden');
+                        menuButton.setAttribute('aria-expanded', (!isHidden).toString());
+                    });
+                    mobileMenu.querySelectorAll('a').forEach(function (link) {
+                        link.addEventListener('click', function () {
+                            mobileMenu.classList.add('hidden');
+                            menuButton.setAttribute('aria-expanded', 'false');
+                        });
+                    });
+                });
+            </script>
         </header>
         <main class="flex-1">
             <div class="max-w-6xl mx-auto px-6 py-10">
