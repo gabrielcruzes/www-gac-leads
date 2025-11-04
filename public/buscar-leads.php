@@ -351,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 }
 
-$historicoBuscas = SearchHistory::listar($userId, 10);
+$historicoBuscas = SearchHistory::listar($userId, 5);
 
 renderPageStart('Buscar Leads', 'buscar');
 ?>

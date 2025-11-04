@@ -17,6 +17,7 @@ function renderPageStart(string $title, string $active = ''): void
 {
     $user = Auth::user();
     $userName = $user ? $user['name'] : 'Usuário';
+    $isAdmin = $user && (($user['role'] ?? '') === 'admin');
     $navLinks = [
         ['href' => 'index.php', 'label' => 'Dashboard', 'key' => 'dashboard'],
         ['href' => 'buscar-leads.php', 'label' => 'Buscar Leads', 'key' => 'buscar'],
@@ -24,6 +25,9 @@ function renderPageStart(string $title, string $active = ''): void
         ['href' => 'comprar-creditos.php', 'label' => 'Comprar Créditos', 'key' => 'creditos'],
         ['href' => 'historico-exportacoes.php', 'label' => 'Exportações', 'key' => 'historico'],
     ];
+    if ($isAdmin) {
+        $navLinks[] = ['href' => 'admin/index.php', 'label' => 'Admin', 'key' => 'admin'];
+    }
     ?>
     <!DOCTYPE html>
     <html lang="pt-BR">

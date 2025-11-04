@@ -23,12 +23,26 @@ if ($user === null) {
     exit;
 }
 
+$flashSuccess = $_SESSION['flash_success'] ?? '';
+$flashError = $_SESSION['flash_error'] ?? '';
+unset($_SESSION['flash_success'], $_SESSION['flash_error']);
+
 $credits = $user['credits'] ?? 0;
 $exports = ExportService::listarHistorico((int) $user['id']);
 $recentExports = array_slice($exports, 0, 5);
 
 renderPageStart('Dashboard', 'dashboard');
 ?>
+<?php if ($flashSuccess): ?>
+    <div class="mb-6 rounded-lg bg-green-100 text-green-700 px-4 py-3 text-sm">
+        <?php echo htmlspecialchars($flashSuccess); ?>
+    </div>
+<?php endif; ?>
+<?php if ($flashError): ?>
+    <div class="mb-6 rounded-lg bg-red-100 text-red-700 px-4 py-3 text-sm">
+        <?php echo htmlspecialchars($flashError); ?>
+    </div>
+<?php endif; ?>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="bg-white rounded-xl shadow p-6">
             <p class="text-sm text-slate-500 mb-2">Seus créditos</p>

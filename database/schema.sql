@@ -14,6 +14,7 @@ DROP TABLE IF EXISTS credit_orders;
 DROP TABLE IF EXISTS purchases;
 DROP TABLE IF EXISTS leads;
 DROP TABLE IF EXISTS cnae_searches;
+DROP TABLE IF EXISTS admin_credit_adjustments;
 DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
@@ -24,6 +25,18 @@ CREATE TABLE users (
   credits INT NOT NULL DEFAULT 0,
   role ENUM('user','admin') DEFAULT 'user',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE admin_credit_adjustments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  admin_id INT NOT NULL,
+  change_amount INT NOT NULL,
+  direction ENUM('add','subtract') NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_credit_adjustments_user (user_id, created_at DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE leads (

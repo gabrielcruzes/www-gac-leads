@@ -28,7 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!Auth::login($email, $password)) {
         $error = 'Credenciais inválidas. Tente novamente.';
     } else {
-        header('Location: index.php');
+        $redirect = Auth::isAdmin() ? 'admin/index.php' : 'index.php';
+        header('Location: ' . $redirect);
         exit;
     }
 }

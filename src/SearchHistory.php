@@ -32,7 +32,7 @@ class SearchHistory
      *
      * @return array<int, array{filters: array, results_count: int, created_at: string}>
      */
-    public static function listar(int $userId, int $limite = 10): array
+    public static function listar(int $userId, int $limite = 5): array
     {
         $pdo = Database::getConnection();
         $stmt = $pdo->prepare('SELECT filters, results_count, created_at FROM cnae_searches WHERE user_id = :user ORDER BY created_at DESC LIMIT :limite');

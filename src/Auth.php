@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * src/Auth.php
  *
@@ -21,14 +21,19 @@ class Auth
         $pdo = Database::getConnection();
 
         try {
-            $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash, credits) VALUES (:name, :email, :password_hash, :credits)');
+            $adminCountStmt = $pdo->query("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+            $hasAdmin = (int) ($adminCountStmt->fetchColumn() ?: 0) > 0;
+            $role = $hasAdmin ? 'user' : 'admin';
+
+            $stmt = $pdo->prepare('INSERT INTO users (name, email, password_hash, credits, role) VALUES (:name, :email, :password_hash, :credits, :role)');
             $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
             return $stmt->execute([
                 ':name' => $name,
                 ':email' => $email,
                 ':password_hash' => $passwordHash,
-                ':credits' => 5, // crédito inicial padrão
+                ':credits' => 1, // credito inicial padrao
+                ':role' => $role,
             ]);
         } catch (PDOException $e) {
             // TODO registrar o erro em um log centralizado
@@ -52,6 +57,7 @@ class Auth
 
         $_SESSION['user_id'] = (int) $user['id'];
         $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_role'] = $user['role'] ?? 'user';
 
         return true;
     }
@@ -75,6 +81,24 @@ class Auth
     public static function check(): bool
     {
         return isset($_SESSION['user_id']);
+    }
+
+    /**
+     * Verifica se o usuário autenticado possui perfil admin.
+     */
+    public static function isAdmin(): bool
+    {
+        if (!self::check()) {
+            return false;
+        }
+
+        if (isset($_SESSION['user_role'])) {
+            return $_SESSION['user_role'] === 'admin';
+        }
+
+        $user = self::user();
+
+        return $user !== null && ($user['role'] ?? 'user') === 'admin';
     }
 
     /**
@@ -104,4 +128,25 @@ class Auth
             exit;
         }
     }
+
+    /**
+     * Garante acesso exclusivo a admins.
+     */
+    public static function requireAdmin(): void
+    {
+        if (!self::check()) {
+            header('Location: /login.php');
+            exit;
+        }
+
+        if (!self::isAdmin()) {
+            $_SESSION['flash_error'] = 'Voce nao tem permissao para acessar esta area.';
+            header('Location: /index.php');
+            exit;
+        }
+    }
 }
+
+
+
+
