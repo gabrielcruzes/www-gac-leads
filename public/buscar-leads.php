@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * public/buscar-leads.php
  *
@@ -752,7 +752,6 @@ renderPageStart('Buscar Leads', 'buscar');
 <script src="assets/js/buscar-leads.js"></script>
 <?php
 renderPageEnd();
-
 
 
 
