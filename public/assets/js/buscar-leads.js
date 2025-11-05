@@ -372,10 +372,18 @@ document.addEventListener('DOMContentLoaded', function () {
     leadLinks.forEach(function (link) {
         link.addEventListener('click', function (event) {
             event.preventDefault();
-            const proceed = confirm('Visualizar os detalhes deste lead consumira 1 credito. Deseja continuar?');
-            if (proceed) {
+            const jaImportado = link.dataset.imported === '1';
+            if (jaImportado) {
                 window.location.href = link.href;
+                return;
             }
+
+            const proceed = confirm('Visualizar os detalhes deste lead consumira 1 credito. Deseja continuar?');
+            if (!proceed) {
+                return;
+            }
+
+            window.location.href = link.href;
         });
     });
 
@@ -441,8 +449,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             let selected = 0;
+            const ativos = [];
 
             checkboxes.forEach(function (cb) {
+                if (cb.disabled) {
+                    cb.checked = false;
+                    return;
+                }
+
+                ativos.push(cb);
+
                 if (cb.checked) {
                     selected += 1;
                     if (hiddenContainer) {
@@ -469,6 +485,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 submitBtn.classList.toggle('opacity-50', !habilitado);
                 submitBtn.classList.toggle('cursor-not-allowed', !habilitado);
             }
+
+            if (selectAll) {
+                const totalAtivos = ativos.length;
+                const marcados = ativos.filter(function (cb) {
+                    return cb.checked;
+                }).length;
+
+                if (totalAtivos === 0) {
+                    selectAll.checked = false;
+                    selectAll.indeterminate = false;
+                    selectAll.disabled = true;
+                } else {
+                    selectAll.disabled = false;
+                    selectAll.checked = marcados === totalAtivos;
+                    selectAll.indeterminate = marcados > 0 && marcados < totalAtivos;
+                }
+            }
         };
 
         checkboxes.forEach(function (cb) {
@@ -479,6 +512,9 @@ document.addEventListener('DOMContentLoaded', function () {
             selectAll.addEventListener('change', function () {
                 const marcado = selectAll.checked;
                 checkboxes.forEach(function (cb) {
+                    if (cb.disabled) {
+                        return;
+                    }
                     cb.checked = marcado;
                 });
                 updateHidden();

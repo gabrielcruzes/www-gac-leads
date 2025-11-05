@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * public/buscar-leads.php
  *
@@ -369,7 +369,7 @@ renderPageStart('Buscar Leads', 'buscar');
                        placeholder="Opcional - ex.: 6201501"
                        value="<?php echo htmlspecialchars($formState['cnae']); ?>"
                        class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                <p class="text-xs text-slate-400 mt-1">Informe os 7 digitos do CNAE somente se desejar filtrar pelo segmento.</p>
+                <p class="text-xs text-slate-400 mt-1">Informe os 7 dígitos do CNAE somente se desejar filtrar pelo segmento.</p>
             </div>
             <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1">UF</label>
@@ -383,20 +383,20 @@ renderPageStart('Buscar Leads', 'buscar');
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Municipio</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Município</label>
                 <select name="municipio" id="search-municipio" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" data-initial-municipio="<?php echo htmlspecialchars($formState['municipio']); ?>" data-initial-display="<?php echo htmlspecialchars($formState['municipio_display']); ?>" <?php echo $formState['uf'] === '' ? 'disabled' : ''; ?>>
                     <option value="">Todos os municipios</option>
                 </select>
                 <input type="hidden" name="municipio_display" id="search-municipio-display" value="<?php echo htmlspecialchars($formState['municipio_display']); ?>">
 
                 <noscript>
-                    <p class="text-xs text-red-500 mt-1">Ative o JavaScript para selecionar municipios.</p>
+                    <p class="text-xs text-red-500 mt-1">Ative o JavaScript para selecionar municípios.</p>
                 </noscript>
             </div>
             <input type="hidden" name="pagina" id="search-pagina" value="<?php echo (int) $formState['pagina']; ?>">
             <input type="hidden" name="page_navigation" id="search-page-navigation" value="">
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-slate-600 mb-1">Situacao cadastral</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Situação cadastral</label>
                 <select name="situacao" id="search-situacao" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
                     <?php foreach ($situacoesDisponiveis as $situacao): ?>
                         <option value="<?php echo $situacao; ?>" <?php echo $formState['situacao'] === $situacao ? 'selected' : ''; ?>>
@@ -419,11 +419,11 @@ renderPageStart('Buscar Leads', 'buscar');
             </div>
 
             <div class="md:col-span-3">
-                <label class="block text-sm font-medium text-slate-600 mb-1">Codigos CNAE secundarios</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Códigos CNAE secundarios</label>
                 <textarea name="codigo_atividade_secundaria" rows="3" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Separe com virgula ou quebra de linha"><?php echo htmlspecialchars($formState['codigo_atividade_secundaria']); ?></textarea>
             </div>
             <div class="md:col-span-3">
-                <label class="block text-sm font-medium text-slate-600 mb-1">Codigos de natureza juridica</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Códigos de natureza juridica</label>
                 <textarea name="codigo_natureza_juridica" rows="3" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Separe com virgula ou quebra de linha"><?php echo htmlspecialchars($formState['codigo_natureza_juridica']); ?></textarea>
             </div>
 
@@ -433,11 +433,11 @@ renderPageStart('Buscar Leads', 'buscar');
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Capital social minimo (R$)</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Capital social mínimo (R$)</label>
                 <input type="text" name="capital_social_minimo" value="<?php echo htmlspecialchars($formState['capital_social_minimo']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Opcional">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Capital social maximo (R$)</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Capital social máximo (R$)</label>
                 <input type="text" name="capital_social_maximo" value="<?php echo htmlspecialchars($formState['capital_social_maximo']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Opcional">
             </div>
 
@@ -450,7 +450,7 @@ renderPageStart('Buscar Leads', 'buscar');
                 <input type="date" name="data_abertura_fim" value="<?php echo htmlspecialchars($formState['data_abertura_fim']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
             </div>
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Ultimos dias</label>
+                <label class="block text-sm font-medium text-slate-600 mb-1">Últimos dias</label>
                 <input type="number" min="1" name="data_abertura_ultimos_dias" value="<?php echo htmlspecialchars($formState['data_abertura_ultimos_dias']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Ex.: 30">
             </div>
             <div>
@@ -529,7 +529,7 @@ renderPageStart('Buscar Leads', 'buscar');
 
         <?php if (!empty($historicoBuscas)): ?>
             <div class="bg-white rounded-xl shadow p-6 mb-8">
-                <h2 class="text-lg font-semibold text-blue-700 mb-3">Historico de pesquisas</h2>
+                <h2 class="text-lg font-semibold text-blue-700 mb-3">Histórico de pesquisas</h2>
                 <ul class="space-y-3">
                     <?php foreach ($historicoBuscas as $registro): ?>
                         <?php $filtroRegistro = is_array($registro['filters'] ?? null) ? $registro['filters'] : []; ?>
@@ -568,9 +568,8 @@ renderPageStart('Buscar Leads', 'buscar');
                                     </p>
                                     <p class="text-xs text-slate-500">
                                         UF: <?php echo htmlspecialchars($historicoUf !== '' ? $historicoUf : '-'); ?> |
-                                        Municipio: <?php echo htmlspecialchars($historicoMunicipioDisplay !== '' ? $historicoMunicipioDisplay : '-'); ?> |
-                                        Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?> |
-                                        Pagina: <?php echo (int) ($filtroRegistro['pagina'] ?? 1); ?>
+                                        Município: <?php echo htmlspecialchars($historicoMunicipioDisplay !== '' ? $historicoMunicipioDisplay : '-'); ?> |
+                                        Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?>
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-3 text-xs text-slate-500">
@@ -677,11 +676,27 @@ renderPageStart('Buscar Leads', 'buscar');
                 </thead>
                 <tbody>
                 <?php foreach ($leads as $lead): ?>
+                    <?php
+                        $jaImportado = !empty($lead['already_imported']);
+                        $listasImportadas = $jaImportado ? array_values(array_filter($lead['imported_lists'] ?? [])) : [];
+                        if ($jaImportado && !$listasImportadas) {
+                            $listasImportadas = [LeadListService::DEFAULT_LIST_NAME];
+                        }
+                        $listaRotulo = $jaImportado ? implode(', ', $listasImportadas) : '';
+                    ?>
                     <tr class="border-b border-slate-100">
                         <td class="px-4 py-2">
-                            <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 bulk-lead-checkbox" value="<?php echo htmlspecialchars($lead['token']); ?>">
+                            <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 bulk-lead-checkbox" value="<?php echo htmlspecialchars($lead['token']); ?>" <?php echo $jaImportado ? 'disabled aria-disabled="true" data-imported="1"' : ''; ?>>
+                            <?php if ($jaImportado): ?>
+                                <span class="mt-1 block text-[11px] font-medium text-green-600 uppercase tracking-wide">Importado</span>
+                            <?php endif; ?>
                         </td>
-                        <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['empresa'] ?? '-'); ?></td>
+                        <td class="px-4 py-2 text-slate-600">
+                            <?php echo htmlspecialchars($lead['empresa'] ?? '-'); ?>
+                            <?php if ($jaImportado): ?>
+                                <span class="ml-2 inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[11px] font-semibold text-green-700">Lista: <?php echo htmlspecialchars($listaRotulo); ?></span>
+                            <?php endif; ?>
+                        </td>
                         <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['segmento'] ?? '-'); ?></td>
                         <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['cnpj_formatado'] ?? ($lead['cnpj'] ?? '-')); ?></td>
                         <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['email'] ?? '-'); ?></td>
@@ -690,13 +705,17 @@ renderPageStart('Buscar Leads', 'buscar');
                         <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['uf'] ?? '-'); ?></td>
                         <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($lead['situacao'] ?? '-'); ?></td>
                         <td class="px-4 py-2 space-y-3">
-                            <div>
-                                <a href="lead-detalhe.php?id=<?php echo urlencode($lead['token']); ?>" class="text-blue-600 hover:text-blue-700 font-medium lead-view-link">
-                                    Ver detalhes
+                            <div class="text-sm">
+                                <a href="lead-detalhe.php?id=<?php echo urlencode($lead['token']); ?>" class="text-blue-600 hover:text-blue-700 font-medium lead-view-link" data-imported="<?php echo $jaImportado ? '1' : '0'; ?>">
+                                    Ver detalhes<?php echo $jaImportado ? ' (já revelado)' : ''; ?>
                                 </a>
                             </div>
                             <div>
-                                <?php if (!empty($listasUsuario)): ?>
+                                <?php if ($jaImportado): ?>
+                                    <div class="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+                                        Já importado em: <span class="font-semibold"><?php echo htmlspecialchars($listaRotulo); ?></span>
+                                    </div>
+                                <?php elseif (!empty($listasUsuario)): ?>
                                     <form method="post" action="adicionar-lead-lista.php" class="space-y-2 single-add-form">
                                         <input type="hidden" name="lead_token" value="<?php echo htmlspecialchars($lead['token']); ?>">
                                         <input type="hidden" name="redirect" value="buscar-leads.php">
@@ -733,8 +752,6 @@ renderPageStart('Buscar Leads', 'buscar');
 <script src="assets/js/buscar-leads.js"></script>
 <?php
 renderPageEnd();
-
-
 
 
 

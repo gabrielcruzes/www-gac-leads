@@ -29,6 +29,94 @@ class LeadListService
     }
 
     /**
+     * Retorna informacoes dos itens ja existentes para os CNPJs informados.
+     *
+     * @return array<string,array{lead_id:?int,summary:array<string,mixed>,data:array<string,mixed>,list_names:array<int,string>}>
+     */
+    public static function buscarItensPorCnpjs(int $userId, array $cnpjs): array
+    {
+        $cnpjNumericos = [];
+        foreach ($cnpjs as $cnpj) {
+            if (is_array($cnpj)) {
+                $cnpj = $cnpj['cnpj'] ?? ($cnpj['cnpj_raw'] ?? null);
+            }
+            $normalizado = self::normalizarCnpj(is_string($cnpj) ? $cnpj : null);
+            if ($normalizado) {
+                $cnpjNumericos[$normalizado] = $normalizado;
+            }
+        }
+
+        if (!$cnpjNumericos) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($cnpjNumericos), '?'));
+        $params = array_merge([$userId], array_values($cnpjNumericos));
+
+        $pdo = Database::getConnection();
+        $sql = <<<SQL
+SELECT
+    i.cnpj,
+    MAX(i.lead_id) AS lead_id,
+    MAX(i.summary) AS summary_json,
+    MAX(i.data) AS data_json,
+    GROUP_CONCAT(DISTINCT l.name ORDER BY l.name SEPARATOR '||') AS listas
+FROM lead_list_items i
+INNER JOIN lead_lists l ON l.id = i.lead_list_id
+WHERE i.user_id = ?
+  AND i.cnpj IN ($placeholders)
+GROUP BY i.cnpj
+SQL;
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!$rows) {
+            return [];
+        }
+
+        $agrupados = [];
+        foreach ($rows as $row) {
+            $cnpj = (string) ($row['cnpj'] ?? '');
+            if ($cnpj === '') {
+                continue;
+            }
+
+            $summary = [];
+            if (!empty($row['summary_json'])) {
+                $decoded = json_decode($row['summary_json'], true);
+                if (is_array($decoded)) {
+                    $summary = $decoded;
+                }
+            }
+
+            $data = [];
+            if (!empty($row['data_json'])) {
+                $decoded = json_decode($row['data_json'], true);
+                if (is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+
+            $listas = [];
+            if (!empty($row['listas'])) {
+                $listas = array_values(array_filter(array_map('trim', explode('||', $row['listas'])), static function ($item) {
+                    return $item !== '';
+                }));
+            }
+
+            $agrupados[$cnpj] = [
+                'lead_id' => $row['lead_id'] !== null ? (int) $row['lead_id'] : null,
+                'summary' => $summary,
+                'data' => $data,
+                'list_names' => $listas,
+            ];
+        }
+
+        return $agrupados;
+    }
+
+    /**
      * Cria uma nova lista e retorna o ID gerado.
      */
     public static function criarLista(int $userId, string $nome): ?int

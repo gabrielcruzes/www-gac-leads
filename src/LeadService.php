@@ -53,6 +53,26 @@ class LeadService
             $_SESSION['lead_results'] = [];
         }
 
+        $usuario = Auth::user();
+        $userId = isset($usuario['id']) ? (int) $usuario['id'] : null;
+
+        $cnpjsParaConsulta = [];
+        foreach ($leads as $leadBruto) {
+            $cnpjExtraido = $leadBruto['cnpj_raw'] ?? preg_replace('/\D/', '', $leadBruto['cnpj'] ?? '');
+            if (!empty($cnpjExtraido)) {
+                $cnpjsParaConsulta[] = $cnpjExtraido;
+            }
+        }
+
+        $leadsJaImportados = [];
+        if ($userId && $cnpjsParaConsulta) {
+            try {
+                $leadsJaImportados = LeadListService::buscarItensPorCnpjs($userId, $cnpjsParaConsulta);
+            } catch (\Throwable $e) {
+                error_log('Falha ao verificar leads ja importados: ' . $e->getMessage());
+            }
+        }
+
         $segmentoPadrao = $filtros['segmento_label'] ?? ($filtros['cnae'] ?? 'Segmento nao informado');
         $resultados = [];
 
@@ -63,6 +83,7 @@ class LeadService
             unset($lead['_raw']);
             $cnpjRaw = $lead['cnpj_raw'] ?? preg_replace('/\D/', '', $lead['cnpj'] ?? '');
             $cnpjRaw = $cnpjRaw ?: null;
+            $leadExistente = $cnpjRaw ? ($leadsJaImportados[$cnpjRaw] ?? null) : null;
 
             $_SESSION['lead_results'][$token] = [
                 'summary' => $lead,
@@ -72,8 +93,31 @@ class LeadService
                 'consumed' => false,
             ];
 
-            $leadComToken = $lead;
+            if ($leadExistente) {
+                $_SESSION['lead_results'][$token]['existing_item'] = $leadExistente;
+                if (!empty($leadExistente['lead_id'])) {
+                    $_SESSION['lead_results'][$token]['db_id'] = (int) $leadExistente['lead_id'];
+                }
+
+                $summaryAtual = $_SESSION['lead_results'][$token]['summary'] ?? [];
+                if (!empty($leadExistente['data'])) {
+                    $_SESSION['lead_results'][$token]['data'] = $leadExistente['data'];
+                    $summaryAtual = self::resumirLead($leadExistente['data'], $summaryAtual);
+                }
+                if (!empty($leadExistente['summary'])) {
+                    $summaryAtual = array_merge($summaryAtual, $leadExistente['summary']);
+                }
+                $_SESSION['lead_results'][$token]['summary'] = $summaryAtual;
+            }
+
+            $leadResumo = $_SESSION['lead_results'][$token]['summary'] ?? $lead;
+            if ($leadExistente && !empty($_SESSION['lead_results'][$token]['data'])) {
+                $leadResumo = array_merge($leadResumo, $_SESSION['lead_results'][$token]['summary'] ?? []);
+            }
+            $leadComToken = array_merge($lead, $leadResumo);
             $leadComToken['token'] = $token;
+            $leadComToken['already_imported'] = (bool) $leadExistente;
+            $leadComToken['imported_lists'] = $leadExistente['list_names'] ?? [];
             $resultados[] = $leadComToken;
         }
 
@@ -107,6 +151,10 @@ class LeadService
     private static function consumirLeadDaSessao(int $userId, string $leadToken): ?array
     {
         $entrada = &$_SESSION['lead_results'][$leadToken];
+
+        if (!empty($entrada['existing_item'])) {
+            return self::retornarLeadExistenteDaSessao($userId, $entrada);
+        }
 
         // Se ja consumido anteriormente, retorna os dados persistidos.
         if (!empty($entrada['consumed']) && isset($entrada['db_id'])) {
@@ -181,6 +229,58 @@ class LeadService
             'data' => $leadData,
             'summary' => $summaryAtual,
             'credits' => $novoSaldo,
+        ];
+    }
+
+    /**
+     * Retorna dados de um lead que ja foi importado anteriormente sem debitar creditos.
+     *
+     * @param array<string,mixed> $entrada
+     * @return array<string,mixed>|null
+     */
+    private static function retornarLeadExistenteDaSessao(int $userId, array &$entrada): ?array
+    {
+        $existente = $entrada['existing_item'] ?? [];
+        $leadId = isset($existente['lead_id']) ? (int) $existente['lead_id'] : null;
+        $listas = $existente['list_names'] ?? [];
+
+        if ($leadId) {
+            $persistido = self::buscarLeadPersistido($leadId, $userId);
+            if ($persistido) {
+                $entrada['data'] = $persistido['data'] ?? [];
+                $entrada['summary'] = $persistido['summary'] ?? [];
+                $entrada['consumed'] = true;
+                $entrada['db_id'] = $persistido['id'] ?? $leadId;
+                $entrada['existing_item']['data'] = $entrada['data'];
+                $entrada['existing_item']['summary'] = $entrada['summary'];
+
+                $persistido['already_imported'] = true;
+                $persistido['imported_lists'] = $listas;
+
+                return $persistido;
+            }
+        }
+
+        $dados = $entrada['data'] ?? ($existente['data'] ?? []);
+        $summary = $entrada['summary'] ?? ($existente['summary'] ?? []);
+        if ($dados) {
+            $summary = self::resumirLead($dados, $summary);
+        }
+
+        $entrada['data'] = $dados;
+        $entrada['summary'] = $summary;
+        $entrada['consumed'] = true;
+        if ($leadId) {
+            $entrada['db_id'] = $leadId;
+        }
+
+        return [
+            'id' => $leadId,
+            'data' => $dados,
+            'summary' => $summary,
+            'credits' => self::buscarCreditosAtuais($userId),
+            'already_imported' => true,
+            'imported_lists' => $listas,
         ];
     }
 
