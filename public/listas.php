@@ -23,16 +23,33 @@ $flashError = $_SESSION['flash_error'] ?? '';
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $nome = trim($_POST['nome_lista'] ?? '');
+    $acao = $_POST['acao'] ?? 'criar';
 
-    if ($nome === '') {
-        $_SESSION['flash_error'] = 'Informe um nome para a lista.';
-    } else {
-        $novoId = LeadListService::criarLista($userId, $nome);
-        if ($novoId) {
-            $_SESSION['flash_success'] = 'Lista criada com sucesso.';
+    if ($acao === 'renomear') {
+        $listaId = (int) ($_POST['lista_id'] ?? 0);
+        $novoNome = trim($_POST['novo_nome'] ?? '');
+
+        if ($listaId <= 0 || $novoNome === '') {
+            $_SESSION['flash_error'] = 'Informe um nome valido para renomear a lista.';
         } else {
-            $_SESSION['flash_error'] = 'Nao foi possivel criar a lista.';
+            if (LeadListService::renomearLista($userId, $listaId, $novoNome)) {
+                $_SESSION['flash_success'] = 'Nome da lista atualizado com sucesso.';
+            } else {
+                $_SESSION['flash_error'] = 'Nao foi possivel atualizar o nome da lista.';
+            }
+        }
+    } else {
+        $nome = trim($_POST['nome_lista'] ?? '');
+
+        if ($nome === '') {
+            $_SESSION['flash_error'] = 'Informe um nome para a lista.';
+        } else {
+            $novoId = LeadListService::criarLista($userId, $nome);
+            if ($novoId) {
+                $_SESSION['flash_success'] = 'Lista criada com sucesso.';
+            } else {
+                $_SESSION['flash_error'] = 'Nao foi possivel criar a lista.';
+            }
         }
     }
 
@@ -63,6 +80,7 @@ renderPageStart('Listas de Leads', 'listas');
         <?php endif; ?>
 
         <form method="post" class="grid md:grid-cols-3 gap-4 items-end mb-6">
+            <input type="hidden" name="acao" value="criar">
             <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-slate-600 mb-1">Nome da nova lista</label>
                 <input type="text" name="nome_lista" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Ex.: Leads de Tecnologia - Sao Paulo">
@@ -80,17 +98,32 @@ renderPageStart('Listas de Leads', 'listas');
             <div class="grid md:grid-cols-2 gap-4">
                 <?php foreach ($listas as $lista): ?>
                     <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
-                        <div class="flex items-center justify-between mb-3">
-                            <h2 class="text-lg font-semibold text-blue-700">
-                                <?php echo htmlspecialchars($lista['name']); ?>
-                            </h2>
-                            <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <h2 class="text-lg font-semibold text-blue-700">
+                                    <?php echo htmlspecialchars($lista['name']); ?>
+                                </h2>
+                                <button type="button" class="rename-trigger inline-flex items-center justify-center w-8 h-8 rounded-full border border-slate-200 text-slate-500 hover:text-blue-700 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-600" data-target="rename-form-<?php echo (int) $lista['id']; ?>" aria-label="Editar nome da lista <?php echo htmlspecialchars($lista['name']); ?>">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                        <path d="M13.586 3a2 2 0 0 1 2.828 2.828l-.793.793-2.828-2.828.793-.793ZM12.172 4.414 4 12.586V16h3.414l8.172-8.172-3.414-3.414Z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium whitespace-nowrap">
                                 <?php echo (int) ($lista['total_items'] ?? 0); ?> leads
                             </span>
                         </div>
-                        <p class="text-xs text-slate-500 mb-4">
+                        <p class="text-xs text-slate-500 mb-3">
                             Criada em <?php echo date('d/m/Y H:i', strtotime($lista['created_at'])); ?>
                         </p>
+                        <form id="rename-form-<?php echo (int) $lista['id']; ?>" method="post" class="hidden flex flex-col sm:flex-row sm:items-center gap-2 mb-3">
+                            <input type="hidden" name="acao" value="renomear">
+                            <input type="hidden" name="lista_id" value="<?php echo (int) $lista['id']; ?>">
+                            <input type="text" name="novo_nome" value="<?php echo htmlspecialchars($lista['name']); ?>" class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Novo nome da lista">
+                            <button type="submit" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-3 py-2 rounded-lg text-sm">
+                                Salvar nome
+                            </button>
+                        </form>
                         <a href="lista-detalhe.php?id=<?php echo (int) $lista['id']; ?>" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
                             Ver detalhes
                         </a>
@@ -99,5 +132,35 @@ renderPageStart('Listas de Leads', 'listas');
             </div>
         <?php endif; ?>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var triggers = document.querySelectorAll('.rename-trigger');
+            triggers.forEach(function (trigger) {
+                trigger.addEventListener('click', function () {
+                    var targetId = trigger.getAttribute('data-target');
+                    if (!targetId) {
+                        return;
+                    }
+                    var form = document.getElementById(targetId);
+                    if (!form) {
+                        return;
+                    }
+                    var isHidden = form.classList.contains('hidden');
+                    if (isHidden) {
+                        form.classList.remove('hidden');
+                        var input = form.querySelector('input[name="novo_nome"]');
+                        if (input) {
+                            setTimeout(function () {
+                                input.focus();
+                                input.select();
+                            }, 0);
+                        }
+                    } else {
+                        form.classList.add('hidden');
+                    }
+                });
+            });
+        });
+    </script>
 <?php
 renderPageEnd();

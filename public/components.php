@@ -52,8 +52,7 @@ function renderPageStart(string $title, string $active = ''): void
             <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <a href="index.php" class="flex items-center gap-2">
-                        <img src="<?php echo $logoPath; ?>" alt="GAC Leads" class="h-8 w-auto">
-                        <span class="text-xl font-semibold text-blue-700 hidden sm:inline">GAC Leads</span>
+                        <img src="<?php echo $logoPath; ?>" alt="GAC Leads" class="h-10 w-auto">
                     </a>
                 </div>
                 <div class="flex items-center gap-4">

@@ -22,6 +22,7 @@ $segmentoExportado = '';
 $quantidadeExportada = 0;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    unset($_SESSION['last_export_ready']);
     $token = $_POST['export_token'] ?? '';
     $lastToken = $_SESSION['last_search_token'] ?? '';
     $dadosBusca = $_SESSION['last_search_export'] ?? null;
@@ -40,16 +41,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             return $lead;
         }, $leads);
 
-        $user = Auth::user();
-        $filePath = ExportService::gerarCsv((int) $user['id'], $segmento, $leadsParaExportar);
-
-        if ($filePath) {
-            $successMessage = 'Exportacao gerada com sucesso! Seu arquivo esta pronto para download.';
-            $downloadLink = '../' . $filePath;
-            $segmentoExportado = $segmento;
-            $quantidadeExportada = count($leadsParaExportar);
+        if (empty($leadsParaExportar)) {
+            $errorMessage = 'Nao ha registros suficientes para gerar o CSV. Realize uma nova busca com resultados.';
+            unset($_SESSION['last_export_ready']);
         } else {
-            $errorMessage = 'Falha ao gerar o arquivo CSV. Tente novamente.';
+            $user = Auth::user();
+            $filePath = ExportService::gerarCsv((int) $user['id'], $segmento, $leadsParaExportar);
+
+            if ($filePath) {
+                $successMessage = 'Exportacao gerada com sucesso! Seu arquivo esta pronto para download.';
+                $downloadLink = 'download-export.php?token=' . urlencode($token);
+                $segmentoExportado = $segmento;
+                $quantidadeExportada = count($leadsParaExportar);
+                $_SESSION['last_export_ready'] = [
+                    'token' => $token,
+                    'path' => $filePath,
+                    'filename' => basename($filePath),
+                ];
+            } else {
+                $errorMessage = 'Falha ao gerar o arquivo CSV. Tente novamente.';
+                unset($_SESSION['last_export_ready']);
+            }
         }
     }
 }

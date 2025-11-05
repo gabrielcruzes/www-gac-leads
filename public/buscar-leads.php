@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 /**
  * public/buscar-leads.php
  *
@@ -22,6 +22,9 @@ Auth::requireLogin();
 $usuario = Auth::user();
 $userId = (int) ($usuario['id'] ?? 0);
 $listasUsuario = LeadListService::listarListas($userId);
+$pageSize = 100;
+$totalResultados = 0;
+$hasMoreResults = false;
 
 $ufs = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS',
@@ -116,7 +119,7 @@ $formState = [
     'uf' => '',
     'municipio' => '',
     'municipio_display' => '',
-    'quantidade' => 100,
+    'quantidade' => $pageSize,
     'pagina' => 1,
     'situacao' => 'ATIVA',
     'capital_social_minimo' => '',
@@ -132,7 +135,7 @@ $formState = [
     'com_email' => true,
     'com_telefone' => false,
     'excluir_email_contab' => false,
-    'excluir_empresas_visualizadas' => true,
+    'excluir_empresas_visualizadas' => false,
     'codigo_atividade_secundaria' => '',
     'codigo_natureza_juridica' => '',
     'cep' => '',
@@ -151,6 +154,7 @@ $historicoBuscas = [];
 unset($_SESSION['flash_success'], $_SESSION['flash_error']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    unset($_SESSION['last_export_ready']);
     $cnaeInput = trim($_POST['cnae'] ?? '');
     $formState['cnae'] = preg_replace('/\D/', '', $cnaeInput);
     $ufRecebida = strtoupper(trim($_POST['uf'] ?? ''));
@@ -158,13 +162,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $municipioRecebido = trim((string) ($_POST['municipio'] ?? ''));
     $municipioDisplayRecebido = trim((string) ($_POST['municipio_display'] ?? ''));
     $municipioBase = $municipioRecebido !== '' ? $municipioRecebido : $municipioDisplayRecebido;
+    $pageNavigation = !empty($_POST['page_navigation']);
     $formState['municipio'] = normalizeMunicipio($municipioBase);
     $formState['municipio_display'] = $municipioDisplayRecebido !== '' ? $municipioDisplayRecebido : $municipioBase;
     if ($formState['municipio_display'] !== '') {
         $formState['municipio_display'] = trim($formState['municipio_display']);
     }
-    $formState['quantidade'] = max(0, (int) ($_POST['quantidade'] ?? 0));
+    $formState['quantidade'] = $pageSize;
     $formState['pagina'] = max(1, (int) ($_POST['pagina'] ?? 1));
+    if (!$pageNavigation) {
+        $formState['pagina'] = 1;
+    }
     $formState['capital_social_minimo'] = trim($_POST['capital_social_minimo'] ?? '');
     $formState['capital_social_maximo'] = trim($_POST['capital_social_maximo'] ?? '');
     $formState['mei'] = $_POST['mei'] ?? '';
@@ -178,6 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formState['com_email'] = !empty($_POST['com_email']);
     $formState['com_telefone'] = !empty($_POST['com_telefone']);
     $formState['excluir_email_contab'] = !empty($_POST['excluir_email_contab']);
+    $formState['excluir_empresas_visualizadas'] = false;
     $formState['codigo_atividade_secundaria'] = trim($_POST['codigo_atividade_secundaria'] ?? '');
     $formState['codigo_natureza_juridica'] = trim($_POST['codigo_natureza_juridica'] ?? '');
     $formState['cep'] = trim($_POST['cep'] ?? '');
@@ -199,10 +208,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($formState['uf'] !== '' && !in_array($formState['uf'], $ufs, true)) {
         $errors[] = 'Selecione uma UF valida.';
-    }
-
-    if ($formState['quantidade'] <= 0) {
-        $errors[] = 'Informe um limite de resultados valido.';
     }
 
     $capitalMin = parseCurrencyValue($formState['capital_social_minimo']);
@@ -238,7 +243,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'segmento_label' => $formState['cnae'] !== '' ? 'CNAE ' . $formState['cnae'] : 'Consulta personalizada',
             'municipio' => $formState['municipio'],
             'municipio_display' => $formState['municipio_display'],
-            'quantidade' => $formState['quantidade'],
+            'quantidade' => $pageSize,
             'pagina' => $formState['pagina'],
             'situacao_cadastral' => $formState['situacao'],
             'somente_celular' => $formState['somente_celular'],
@@ -248,7 +253,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'com_email' => $formState['com_email'],
             'com_telefone' => $formState['com_telefone'],
             'excluir_email_contab' => $formState['excluir_email_contab'],
-            'excluir_empresas_visualizadas' => $formState['excluir_empresas_visualizadas'],
+            'excluir_empresas_visualizadas' => false,
             'matriz_filial' => $formState['matriz_filial'],
         ];
 
@@ -315,20 +320,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 
         try {
-            $leads = LeadService::buscarLeads($filtros);
+            $resultadoBusca = LeadService::buscarLeads($filtros);
+            $leads = $resultadoBusca['leads'] ?? [];
+            $totalResultados = (int) ($resultadoBusca['total'] ?? count($leads));
+            $hasMoreResults = (bool) ($resultadoBusca['has_more'] ?? false);
 
             try {
-                SearchHistory::registrar($userId, $formState, count($leads));
+                SearchHistory::registrar($userId, $formState, $totalResultados);
             } catch (\Throwable $historyException) {
                 error_log('Erro ao salvar historico de buscas: ' . $historyException->getMessage());
             }
 
+            $_SESSION['last_search_total'] = $totalResultados;
             $_SESSION['last_search_export'] = [
                 'segmento' => $filtros['segmento_label'],
                 'leads' => $leads,
                 'filters' => $formState,
+                'total' => $totalResultados,
             ];
             $_SESSION['last_search_token'] = bin2hex(random_bytes(8));
+            unset($_SESSION['last_export_ready']);
         } catch (Throwable $exception) {
             error_log('Erro ao buscar leads: ' . $exception->getMessage());
             if (stripos($exception->getMessage(), 'cURL') !== false) {
@@ -336,6 +347,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $errors[] = 'Nao foi possivel consultar a API no momento. Detalhes: ' . $exception->getMessage();
             }
+            $leads = [];
+            $totalResultados = 0;
+            $hasMoreResults = false;
+            $_SESSION['last_search_total'] = 0;
+            unset($_SESSION['last_search_export'], $_SESSION['last_search_token'], $_SESSION['last_export_ready']);
         }
 }
 }
@@ -372,18 +388,13 @@ renderPageStart('Buscar Leads', 'buscar');
                     <option value="">Todos os municipios</option>
                 </select>
                 <input type="hidden" name="municipio_display" id="search-municipio-display" value="<?php echo htmlspecialchars($formState['municipio_display']); ?>">
-                <p class="text-xs text-slate-400 mt-1">Escolha uma UF para carregar as cidades disponiveis.</p>
+
                 <noscript>
                     <p class="text-xs text-red-500 mt-1">Ative o JavaScript para selecionar municipios.</p>
                 </noscript>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Limite de resultados</label>
-                <input type="number" min="1" max="100" name="quantidade" id="search-quantidade" value="<?php echo (int) $formState['quantidade']; ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">           </div>
-            <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">Pagina</label>
-                <input type="number" min="1" name="pagina" value="<?php echo (int) $formState['pagina']; ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
-            </div>
+            <input type="hidden" name="pagina" id="search-pagina" value="<?php echo (int) $formState['pagina']; ?>">
+            <input type="hidden" name="page_navigation" id="search-page-navigation" value="">
             <div class="md:col-span-2">
                 <label class="block text-sm font-medium text-slate-600 mb-1">Situacao cadastral</label>
                 <select name="situacao" id="search-situacao" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
@@ -533,7 +544,6 @@ renderPageStart('Buscar Leads', 'buscar');
                             if ($historicoMunicipioDisplay === '' && $historicoMunicipio !== '') {
                                 $historicoMunicipioDisplay = $historicoMunicipio;
                             }
-                            $historicoQuantidade = $filtroRegistro['quantidade'] ?? '';
                             $historicoSituacao = $filtroRegistro['situacao'] ?? ($filtroRegistro['situacao_cadastral'] ?? 'ATIVA');
                             if (is_array($historicoSituacao)) {
                                 $historicoSituacao = $historicoSituacao[0] ?? 'ATIVA';
@@ -546,8 +556,7 @@ renderPageStart('Buscar Leads', 'buscar');
                             $dadosReaplicar['uf'] = $filtroRegistro['uf'] ?? '';
                             $dadosReaplicar['municipio'] = $historicoMunicipio;
                             $dadosReaplicar['municipio_display'] = $historicoMunicipioDisplay;
-                            $dadosReaplicar['quantidade'] = $historicoQuantidade;
-                            $dadosReaplicar['pagina'] = $filtroRegistro['pagina'] ?? 1;
+                            $dadosReaplicar['pagina'] = 1;
                             $dadosReaplicar['situacao'] = $historicoSituacao;
                             $dadosReaplicarAttr = htmlspecialchars(json_encode($dadosReaplicar, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
                         ?>
@@ -560,7 +569,8 @@ renderPageStart('Buscar Leads', 'buscar');
                                     <p class="text-xs text-slate-500">
                                         UF: <?php echo htmlspecialchars($historicoUf !== '' ? $historicoUf : '-'); ?> |
                                         Municipio: <?php echo htmlspecialchars($historicoMunicipioDisplay !== '' ? $historicoMunicipioDisplay : '-'); ?> |
-                                        Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?>
+                                        Resultados: <?php echo (int) ($registro['results_count'] ?? 0); ?> |
+                                        Pagina: <?php echo (int) ($filtroRegistro['pagina'] ?? 1); ?>
                                     </p>
                                 </div>
                                 <div class="flex items-center gap-3 text-xs text-slate-500">
@@ -591,20 +601,37 @@ renderPageStart('Buscar Leads', 'buscar');
     </div>
 
 <?php if (!empty($leads)): ?>
+    <?php
+        $currentPage = max(1, (int) $formState['pagina']);
+        $hasPreviousPage = $currentPage > 1;
+        $totalPaginas = $totalResultados > 0 ? (int) max(1, ceil($totalResultados / $pageSize)) : ($currentPage + ($hasMoreResults ? 1 : 0));
+        $hasNextPage = $hasMoreResults || ($totalResultados > ($currentPage * $pageSize));
+    ?>
     <div class="bg-white rounded-xl shadow p-6">
         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
                 <h2 class="text-lg font-semibold text-blue-700">Resultados</h2>
                 <p class="text-xs text-slate-500 mt-1">
-                    Exibindo <?php echo count($leads); ?> empresas para o filtro selecionado.
+                    Exibindo <?php echo count($leads); ?> empresas na pagina <?php echo $currentPage; ?> de <?php echo max(1, $totalPaginas); ?> (<?php echo $pageSize; ?> por pagina). Total encontrados: <?php echo (int) $totalResultados; ?>.
                 </p>
             </div>
-            <form method="post" action="exportar-csv.php" class="flex items-center gap-3">
-                <input type="hidden" name="export_token" value="<?php echo htmlspecialchars($_SESSION['last_search_token'] ?? ''); ?>">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg">
-                    Exportar CSV
-                </button>
-            </form>
+            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div class="flex items-center gap-2">
+                    <button type="button" class="pagination-button bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-3 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" data-page-shift="-1" <?php echo $hasPreviousPage ? '' : 'disabled'; ?>>
+                        Pagina anterior
+                    </button>
+                    <span class="text-sm text-slate-500">Pagina <?php echo $currentPage; ?></span>
+                    <button type="button" class="pagination-button bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-3 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" data-page-shift="1" <?php echo $hasNextPage ? '' : 'disabled'; ?>>
+                        Proxima pagina
+                    </button>
+                </div>
+                <form method="post" action="exportar-csv.php" class="flex items-center gap-3">
+                    <input type="hidden" name="export_token" value="<?php echo htmlspecialchars($_SESSION['last_search_token'] ?? ''); ?>">
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg">
+                        Exportar CSV
+                    </button>
+                </form>
+            </div>
         </div>
 
         <?php if (!empty($listasUsuario)): ?>
@@ -706,6 +733,7 @@ renderPageStart('Buscar Leads', 'buscar');
 <script src="assets/js/buscar-leads.js"></script>
 <?php
 renderPageEnd();
+
 
 
 

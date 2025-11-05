@@ -16,18 +16,22 @@ class CasaDosDadosApi
 
     /**
      * Consulta a API por empresas com base nos filtros informados.
+     *
+     * @return array{leads:array<int,array<string,mixed>>,total:int,has_more:bool,pagina:int,limite:int}
      */
     public function buscarLeads(array $filtros): array
     {
         $payload = $this->montarPayloadPesquisa($filtros);
-        $quantidadeSolicitada = (int) ($filtros['quantidade'] ?? 0);
+        $quantidadeSolicitada = max(1, (int) ($filtros['quantidade'] ?? 100));
 
         $respostaPesquisa = $this->executarRequisicao('POST', self::SEARCH_ENDPOINT, $payload);
         $pesquisaBemSucedida = $respostaPesquisa['status'] >= 200 && $respostaPesquisa['status'] < 300;
 
+        $json = $respostaPesquisa['json'] ?? [];
+
         $cnpjs = [];
-        if (!empty($respostaPesquisa['json']['cnpjs']) && is_array($respostaPesquisa['json']['cnpjs'])) {
-            $cnpjs = $respostaPesquisa['json']['cnpjs'];
+        if (!empty($json['cnpjs']) && is_array($json['cnpjs'])) {
+            $cnpjs = $json['cnpjs'];
         }
 
         $leads = [];
@@ -50,7 +54,46 @@ class CasaDosDadosApi
             throw new \RuntimeException($mensagemErro);
         }
 
-        return $leads;
+        $totalResultados = null;
+        $possiveisChaves = ['total', 'total_cnpjs', 'quantidade_total', 'total_encontrados', 'total_encontrado'];
+        foreach ($possiveisChaves as $chave) {
+            if (isset($json[$chave])) {
+                $totalResultados = (int) $json[$chave];
+                break;
+            }
+        }
+
+        if ($totalResultados === null && isset($json['meta']['total'])) {
+            $totalResultados = (int) $json['meta']['total'];
+        }
+
+        if ($totalResultados === null && isset($json['paginacao']['total'])) {
+            $totalResultados = (int) $json['paginacao']['total'];
+        }
+
+        if ($totalResultados === null && isset($json['totalResultados'])) {
+            $totalResultados = (int) $json['totalResultados'];
+        }
+
+        if ($totalResultados === null) {
+            if (isset($json['cnpjs']) && is_array($json['cnpjs'])) {
+                $totalResultados = count($json['cnpjs']);
+            } else {
+                $totalResultados = count($leads);
+            }
+        }
+
+        $paginaAtual = max(1, (int) ($payload['pagina'] ?? 1));
+        $limite = max(1, (int) ($payload['limite'] ?? $quantidadeSolicitada));
+        $temMais = $totalResultados > ($paginaAtual * $limite);
+
+        return [
+            'leads' => $leads,
+            'total' => $totalResultados,
+            'has_more' => $temMais,
+            'pagina' => $paginaAtual,
+            'limite' => $limite,
+        ];
     }
 
     /**
@@ -97,7 +140,7 @@ class CasaDosDadosApi
                 'com_email' => isset($filtros['com_email']) ? (bool) $filtros['com_email'] : true,
                 'com_telefone' => isset($filtros['com_telefone']) ? (bool) $filtros['com_telefone'] : false,
                 'excluir_email_contab' => isset($filtros['excluir_email_contab']) ? (bool) $filtros['excluir_email_contab'] : false,
-                'excluir_empresas_visualizadas' => isset($filtros['excluir_empresas_visualizadas']) ? (bool) $filtros['excluir_empresas_visualizadas'] : true,
+                'excluir_empresas_visualizadas' => isset($filtros['excluir_empresas_visualizadas']) ? (bool) $filtros['excluir_empresas_visualizadas'] : false,
                 'somente_celular' => isset($filtros['somente_celular']) ? (bool) $filtros['somente_celular'] : false,
                 'somente_fixo' => isset($filtros['somente_fixo']) ? (bool) $filtros['somente_fixo'] : false,
                 'somente_matriz' => isset($filtros['somente_matriz']) ? (bool) $filtros['somente_matriz'] : false,

@@ -12,6 +12,7 @@ use PDO;
 require_once __DIR__ . '/Database.php';
 require_once __DIR__ . '/CasaDosDadosApi.php';
 require_once __DIR__ . '/Auth.php';
+require_once __DIR__ . '/LeadListService.php';
 
 class LeadService
 {
@@ -19,14 +20,24 @@ class LeadService
      * Busca leads via API da Casa dos Dados e armazena na sessao para consumo posterior.
      *
      * @param array $filtros
-     * @return array
+     * @return array{leads:array<int,array<string,mixed>>,total:int,has_more:bool}
      */
     public static function buscarLeads(array $filtros): array
     {
         $api = new CasaDosDadosApi();
-        $leads = $api->buscarLeads($filtros);
+        $resultadoApi = $api->buscarLeads($filtros);
 
-        return self::armazenarLeadsNaSessao($leads, $filtros);
+        $leadsApi = $resultadoApi['leads'] ?? [];
+        $armazenados = self::armazenarLeadsNaSessao($leadsApi, $filtros);
+
+        $limite = isset($filtros['quantidade']) ? (int) $filtros['quantidade'] : count($leadsApi);
+        $hasMore = (bool) ($resultadoApi['has_more'] ?? (count($leadsApi) >= $limite));
+
+        return [
+            'leads' => $armazenados,
+            'total' => (int) ($resultadoApi['total'] ?? count($armazenados)),
+            'has_more' => $hasMore,
+        ];
     }
 
     /**
@@ -159,6 +170,12 @@ class LeadService
         $entrada['db_id'] = $leadDbId;
         $entrada['summary'] = $summaryAtual;
 
+        try {
+            LeadListService::armazenarLeadVisualizado($userId, $leadDbId, $summaryAtual, $leadData);
+        } catch (\Throwable $e) {
+            error_log('Nao foi possivel registrar o lead consumido na lista padrao: ' . $e->getMessage());
+        }
+
         return [
             'id' => $leadDbId,
             'data' => $leadData,
@@ -185,12 +202,20 @@ class LeadService
         }
 
         $leadData = json_decode($row['data'], true) ?? [];
+        $summary = self::resumirLead($leadData);
+
+        try {
+            LeadListService::armazenarLeadVisualizado($userId, (int) $row['id'], $summary, $leadData);
+        } catch (\Throwable $e) {
+            error_log('Nao foi possivel sincronizar o lead persistido com a lista padrao: ' . $e->getMessage());
+        }
+
         $credits = self::buscarCreditosAtuais($userId);
 
         return [
             'id' => (int) $row['id'],
             'data' => $leadData,
-            'summary' => self::resumirLead($leadData),
+            'summary' => $summary,
             'credits' => $credits,
         ];
     }

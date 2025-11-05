@@ -1,11 +1,43 @@
 document.addEventListener('DOMContentLoaded', function () {
     const searchForm = document.getElementById('lead-search-form');
+    const pageInput = document.getElementById('search-pagina');
+    const pageNavigationInput = document.getElementById('search-page-navigation');
+    if (pageNavigationInput) {
+        pageNavigationInput.value = '';
+    }
     const cnaeInput = document.getElementById('search-cnae');
     const ufSelect = document.getElementById('search-uf');
     const municipioSelect = document.getElementById('search-municipio');
     const municipioDisplayInput = document.getElementById('search-municipio-display');
     const defaultMunicipioOptionLabel = 'Todos os municipios';
     let municipioRequestId = 0;
+
+    if (searchForm && pageInput) {
+        searchForm.addEventListener('change', function (event) {
+            if (!event || !event.target) {
+                return;
+            }
+
+            if (event.target.id === 'search-pagina') {
+                return;
+            }
+
+            pageInput.value = 1;
+            if (pageNavigationInput) {
+                pageNavigationInput.value = '';
+            }
+        });
+
+        searchForm.addEventListener('submit', function () {
+            var paginaValor = parseInt(pageInput.value || '1', 10);
+            if (!paginaValor || paginaValor < 1) {
+                pageInput.value = 1;
+            }
+            if (pageNavigationInput && (!pageNavigationInput.value || pageNavigationInput.value !== '1')) {
+                pageNavigationInput.value = '';
+            }
+        });
+    }
     let lastMunicipioUf = '';
     const normalizeMunicipioValue = function (value) {
         if (!value) {
@@ -294,8 +326,10 @@ document.addEventListener('DOMContentLoaded', function () {
             if (municipioDisplayInput && municipioDisplayValor && municipioDisplayInput.value === '') {
                 municipioDisplayInput.value = municipioDisplayValor;
             }
-            setFieldValue('quantidade', filtros.quantidade);
             setFieldValue('pagina', filtros.pagina);
+            if (pageNavigationInput) {
+                pageNavigationInput.value = '';
+            }
             setFieldValue('capital_social_minimo', filtros.capital_social_minimo);
             setFieldValue('capital_social_maximo', filtros.capital_social_maximo);
             setFieldValue('codigo_atividade_secundaria', filtros.codigo_atividade_secundaria);
@@ -353,6 +387,44 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    const paginationButtons = document.querySelectorAll('.pagination-button');
+    if (paginationButtons.length && searchForm && pageInput) {
+        paginationButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                if (button.disabled) {
+                    return;
+                }
+
+                if (pageNavigationInput) {
+                    pageNavigationInput.value = '1';
+                }
+
+                var shift = parseInt(button.getAttribute('data-page-shift') || '0', 10);
+                if (!shift) {
+                    return;
+                }
+
+                var current = parseInt(pageInput.value || '1', 10);
+                if (!current || current < 1) {
+                    current = 1;
+                }
+
+                var next = current + shift;
+                if (next < 1) {
+                    next = 1;
+                }
+
+                pageInput.value = next;
+
+                if (typeof searchForm.requestSubmit === 'function') {
+                    searchForm.requestSubmit();
+                } else {
+                    searchForm.submit();
+                }
+            });
+        });
+    }
 
     const bulkForm = document.getElementById('bulk-add-form');
     if (bulkForm) {
@@ -438,4 +510,5 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
+
 

@@ -25,8 +25,8 @@ class ExportService
         $leads = self::normalizarLeads($leads);
 
         $exportDir = __DIR__ . '/../storage/exports';
-        if (!is_dir($exportDir)) {
-            mkdir($exportDir, 0775, true);
+        if (!is_dir($exportDir) && !mkdir($exportDir, 0775, true) && !is_dir($exportDir)) {
+            return null;
         }
 
         $timestamp = (new DateTime())->format('Ymd_His');

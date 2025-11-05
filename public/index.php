@@ -55,7 +55,7 @@ renderPageStart('Dashboard', 'dashboard');
         <div class="bg-white rounded-xl shadow p-6 md:col-span-2">
             <p class="text-sm text-slate-500 mb-2">Próximos passos</p>
             <ul class="space-y-3 text-slate-600 list-disc list-inside">
-                <li>Buscar leads por segmento e quantidade desejada.</li>
+                <li>Buscar leads em lotes de ate 100 resultados por pagina.</li>
                 <li>Visualizar detalhes completos consumindo créditos.</li>
                 <li>Exportar listas CSV e acessar o histórico de downloads.</li>
             </ul>
