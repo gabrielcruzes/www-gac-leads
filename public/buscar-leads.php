@@ -137,8 +137,6 @@ $formState = [
     'codigo_natureza_juridica' => '',
     'cep' => '',
     'cnpj' => '',
-    'ddd' => '',
-    'incluir_atividade_secundaria' => false,
     'matriz_filial' => '',
     'data_abertura_inicio' => '',
     'data_abertura_fim' => '',
@@ -180,13 +178,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formState['com_email'] = !empty($_POST['com_email']);
     $formState['com_telefone'] = !empty($_POST['com_telefone']);
     $formState['excluir_email_contab'] = !empty($_POST['excluir_email_contab']);
-    $formState['excluir_empresas_visualizadas'] = !empty($_POST['excluir_empresas_visualizadas']);
     $formState['codigo_atividade_secundaria'] = trim($_POST['codigo_atividade_secundaria'] ?? '');
     $formState['codigo_natureza_juridica'] = trim($_POST['codigo_natureza_juridica'] ?? '');
     $formState['cep'] = trim($_POST['cep'] ?? '');
     $formState['cnpj'] = trim($_POST['cnpj'] ?? '');
-    $formState['ddd'] = trim($_POST['ddd'] ?? '');
-    $formState['incluir_atividade_secundaria'] = !empty($_POST['incluir_atividade_secundaria']);
     $formState['matriz_filial'] = strtoupper(trim($_POST['matriz_filial'] ?? ''));
     $formState['data_abertura_inicio'] = trim($_POST['data_abertura_inicio'] ?? '');
     $formState['data_abertura_fim'] = trim($_POST['data_abertura_fim'] ?? '');
@@ -254,7 +249,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'com_telefone' => $formState['com_telefone'],
             'excluir_email_contab' => $formState['excluir_email_contab'],
             'excluir_empresas_visualizadas' => $formState['excluir_empresas_visualizadas'],
-            'incluir_atividade_secundaria' => $formState['incluir_atividade_secundaria'],
             'matriz_filial' => $formState['matriz_filial'],
         ];
 
@@ -291,11 +285,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cnpjFiltro = normalizeDigitsList($formState['cnpj']);
         if ($cnpjFiltro) {
             $filtros['cnpj'] = $cnpjFiltro;
-        }
-
-        $dddFiltro = normalizeDigitsList($formState['ddd']);
-        if ($dddFiltro) {
-            $filtros['ddd'] = $dddFiltro;
         }
 
         if ($formState['mei'] === 'optante') {
@@ -433,10 +422,6 @@ renderPageStart('Buscar Leads', 'buscar');
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-slate-600 mb-1">DDD</label>
-                <input type="text" name="ddd" value="<?php echo htmlspecialchars($formState['ddd']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Ex.: 11, 21">
-            </div>
-            <div>
                 <label class="block text-sm font-medium text-slate-600 mb-1">Capital social minimo (R$)</label>
                 <input type="text" name="capital_social_minimo" value="<?php echo htmlspecialchars($formState['capital_social_minimo']); ?>" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Opcional">
             </div>
@@ -513,16 +498,8 @@ renderPageStart('Buscar Leads', 'buscar');
                     <span>Somente filial</span>
                 </label>
                 <label class="flex items-center gap-2 text-sm text-slate-600 mb-1">
-                    <input type="checkbox" name="excluir_empresas_visualizadas" value="1" <?php echo $formState['excluir_empresas_visualizadas'] ? 'checked' : ''; ?>>
-                    <span>Excluir empresas ja visualizadas</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 mb-1">
                     <input type="checkbox" name="excluir_email_contab" value="1" <?php echo $formState['excluir_email_contab'] ? 'checked' : ''; ?>>
                     <span>Excluir e-mails contabeis</span>
-                </label>
-                <label class="flex items-center gap-2 text-sm text-slate-600 mb-1">
-                    <input type="checkbox" name="incluir_atividade_secundaria" value="1" <?php echo $formState['incluir_atividade_secundaria'] ? 'checked' : ''; ?>>
-                    <span>Incluir CNAEs secundarios na busca</span>
                 </label>
             </div>
 

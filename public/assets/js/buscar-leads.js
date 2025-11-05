@@ -302,7 +302,6 @@ document.addEventListener('DOMContentLoaded', function () {
             setFieldValue('codigo_natureza_juridica', filtros.codigo_natureza_juridica);
             setFieldValue('cep', filtros.cep);
             setFieldValue('cnpj', filtros.cnpj);
-            setFieldValue('ddd', filtros.ddd);
             setFieldValue('data_abertura_inicio', filtros.data_abertura_inicio);
             setFieldValue('data_abertura_fim', filtros.data_abertura_fim);
             setFieldValue('data_abertura_ultimos_dias', filtros.data_abertura_ultimos_dias);
@@ -318,8 +317,6 @@ document.addEventListener('DOMContentLoaded', function () {
             setCheckbox('com_email', filtros.com_email);
             setCheckbox('com_telefone', filtros.com_telefone);
             setCheckbox('excluir_email_contab', filtros.excluir_email_contab);
-            setCheckbox('excluir_empresas_visualizadas', filtros.excluir_empresas_visualizadas);
-            setCheckbox('incluir_atividade_secundaria', filtros.incluir_atividade_secundaria);
 
             const situacaoValor = filtros.situacao !== undefined ? filtros.situacao : filtros.situacao_cadastral;
             applySituacao(situacaoValor);
