@@ -18,6 +18,7 @@ if (Auth::check()) {
 $error = '';
 $success = $_SESSION['flash_success'] ?? '';
 unset($_SESSION['flash_success']);
+$logoPath = file_exists(__DIR__ . '/assets/images/logo.png') ? 'assets/images/logo.png' : 'assets/images/logo.svg';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
@@ -53,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="bg-slate-100 min-h-screen flex items-center justify-center">
     <div class="w-full max-w-md bg-white rounded-xl shadow-lg p-10">
         <div class="flex justify-center mb-6">
-            <img src="assets/images/logo.svg" alt="GAC Leads" class="h-10 w-auto">
+            <img src="<?php echo $logoPath; ?>" alt="GAC Leads" class="h-10 w-auto">
         </div>
         <h1 class="text-2xl font-semibold text-blue-700 mb-2">Bem-vindo de volta</h1>
         <p class="text-slate-500 mb-6">Entre para acessar seus leads e créditos.</p>

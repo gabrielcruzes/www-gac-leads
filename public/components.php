@@ -18,6 +18,7 @@ function renderPageStart(string $title, string $active = ''): void
     $user = Auth::user();
     $userName = $user ? $user['name'] : 'Usuário';
     $isAdmin = $user && (($user['role'] ?? '') === 'admin');
+    $logoPath = file_exists(__DIR__ . '/assets/images/logo.png') ? 'assets/images/logo.png' : 'assets/images/logo.svg';
     $navLinks = [
         ['href' => 'index.php', 'label' => 'Dashboard', 'key' => 'dashboard'],
         ['href' => 'buscar-leads.php', 'label' => 'Buscar Leads', 'key' => 'buscar'],
@@ -51,7 +52,7 @@ function renderPageStart(string $title, string $active = ''): void
             <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <a href="index.php" class="flex items-center gap-2">
-                        <img src="assets/images/logo.svg" alt="GAC Leads" class="h-8 w-auto">
+                        <img src="<?php echo $logoPath; ?>" alt="GAC Leads" class="h-8 w-auto">
                         <span class="text-xl font-semibold text-blue-700 hidden sm:inline">GAC Leads</span>
                     </a>
                 </div>
