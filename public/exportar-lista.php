@@ -60,8 +60,19 @@ $dadosExportacao = array_map(
 $arquivo = ExportService::gerarCsv($userId, $lista['name'], $dadosExportacao);
 
 if ($arquivo) {
+    try {
+        $token = bin2hex(random_bytes(16));
+    } catch (\Throwable $exception) {
+        $token = sha1(uniqid((string) $userId, true));
+    }
+
+    $_SESSION['last_export_ready'] = [
+        'token' => $token,
+        'path' => $arquivo,
+        'filename' => basename($arquivo),
+    ];
     $_SESSION['flash_success'] = 'Exportacao gerada com sucesso!';
-    $_SESSION['flash_export_download'] = '../' . $arquivo;
+    $_SESSION['flash_export_download'] = 'download-export.php?token=' . urlencode($token);
 } else {
     $_SESSION['flash_error'] = 'Nao foi possivel gerar o arquivo CSV.';
 }
