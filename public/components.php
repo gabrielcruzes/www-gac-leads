@@ -17,6 +17,8 @@ function renderPageStart(string $title, string $active = ''): void
 {
     $user = Auth::user();
     $userName = $user ? $user['name'] : 'Usuário';
+    $userCredits = $user ? (int) ($user['credits'] ?? 0) : 0;
+    $formattedCredits = number_format($userCredits, 0, ',', '.');
     $isAdmin = $user && (($user['role'] ?? '') === 'admin');
     $logoPath = file_exists(__DIR__ . '/assets/images/logo.png') ? 'assets/images/logo.png' : 'assets/images/logo.svg';
     $navLinks = [
@@ -67,6 +69,12 @@ function renderPageStart(string $title, string $active = ''): void
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
+                    <span class="md:hidden inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10.75 1.75a.75.75 0 0 0-1.5 0V3H7a2.75 2.75 0 0 0-2.75 2.75v8.5A2.75 2.75 0 0 0 7 17h6a2.75 2.75 0 0 0 2.75-2.75v-8.5A2.75 2.75 0 0 0 13 3h-2.25V1.75Zm-3 2.75H13A1.25 1.25 0 0 1 14.25 5.75v8.5A1.25 1.25 0 0 1 13 15.5H7a1.25 1.25 0 0 1-1.25-1.25v-8.5A1.25 1.25 0 0 1 7 4.5Zm2.25 3a.75.75 0 0 0-1.5 0v.25H7.5a.75.75 0 0 0 0 1.5h.25v3h-.25a.75.75 0 0 0 0 1.5h.25v.25a.75.75 0 0 0 1.5 0v-.25h1.25a.75.75 0 0 0 0-1.5H9.5v-3h1.25a.75.75 0 0 0 0-1.5H9.5V7.5Z" clip-rule="evenodd" />
+                        </svg>
+                        Saldo: <?php echo htmlspecialchars($formattedCredits); ?>
+                    </span>
                     <nav class="hidden md:flex items-center gap-4 text-sm font-medium">
                         <?php foreach ($navLinks as $link): ?>
                             <?php $isActive = $active === $link['key']; ?>
@@ -79,6 +87,12 @@ function renderPageStart(string $title, string $active = ''): void
                         <?php endforeach; ?>
                     </nav>
                     <div class="hidden md:flex items-center gap-3">
+                        <span class="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fill-rule="evenodd" d="M10.75 1.75a.75.75 0 0 0-1.5 0V3H7a2.75 2.75 0 0 0-2.75 2.75v8.5A2.75 2.75 0 0 0 7 17h6a2.75 2.75 0 0 0 2.75-2.75v-8.5A2.75 2.75 0 0 0 13 3h-2.25V1.75Zm-3 2.75H13A1.25 1.25 0 0 1 14.25 5.75v8.5A1.25 1.25 0 0 1 13 15.5H7a1.25 1.25 0 0 1-1.25-1.25v-8.5A1.25 1.25 0 0 1 7 4.5Zm2.25 3a.75.75 0 0 0-1.5 0v.25H7.5a.75.75 0 0 0 0 1.5h.25v3h-.25a.75.75 0 0 0 0 1.5h.25v.25a.75.75 0 0 0 1.5 0v-.25h1.25a.75.75 0 0 0 0-1.5H9.5v-3h1.25a.75.75 0 0 0 0-1.5H9.5V7.5Z" clip-rule="evenodd" />
+                            </svg>
+                            Saldo: <?php echo htmlspecialchars($formattedCredits); ?>
+                        </span>
                         <span class="text-sm text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
                         <a href="logout.php" class="text-sm text-slate-500 hover:text-blue-600">Sair</a>
                     </div>
@@ -96,9 +110,17 @@ function renderPageStart(string $title, string $active = ''): void
                         </a>
                     <?php endforeach; ?>
                 </nav>
-                <div class="border-t border-slate-200 px-6 py-4 flex items-center justify-between text-sm">
-                    <span class="text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
-                    <a href="logout.php" class="text-slate-500 hover:text-blue-600">Sair</a>
+                <div class="border-t border-slate-200 px-6 py-4 flex flex-col gap-2 text-sm">
+                    <span class="inline-flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1 font-semibold text-blue-700 w-fit">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M10.75 1.75a.75.75 0 0 0-1.5 0V3H7a2.75 2.75 0 0 0-2.75 2.75v8.5A2.75 2.75 0 0 0 7 17h6a2.75 2.75 0 0 0 2.75-2.75v-8.5A2.75 2.75 0 0 0 13 3h-2.25V1.75Zm-3 2.75H13A1.25 1.25 0 0 1 14.25 5.75v8.5A1.25 1.25 0 0 1 13 15.5H7a1.25 1.25 0 0 1-1.25-1.25v-8.5A1.25 1.25 0 0 1 7 4.5Zm2.25 3a.75.75 0 0 0-1.5 0v.25H7.5a.75.75 0 0 0 0 1.5h.25v3h-.25a.75.75 0 0 0 0 1.5h.25v.25a.75.75 0 0 0 1.5 0v-.25h1.25a.75.75 0 0 0 0-1.5H9.5v-3h1.25a.75.75 0 0 0 0-1.5H9.5V7.5Z" clip-rule="evenodd" />
+                        </svg>
+                        Saldo: <?php echo htmlspecialchars($formattedCredits); ?>
+                    </span>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-600">Olá, <?php echo htmlspecialchars($userName); ?></span>
+                        <a href="logout.php" class="text-slate-500 hover:text-blue-600">Sair</a>
+                    </div>
                 </div>
             </div>
             <script>
