@@ -6,24 +6,61 @@
  */
 
 use App\Auth;
+use App\ExportService;
 
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../src/Auth.php';
+require_once __DIR__ . '/../src/ExportService.php';
 
 Auth::requireLogin();
 
-$token = $_GET['token'] ?? '';
-$exportInfo = $_SESSION['last_export_ready'] ?? null;
-
-if (!$token || !$exportInfo || !isset($exportInfo['token']) || !hash_equals((string) $exportInfo['token'], (string) $token)) {
+$user = Auth::user();
+if ($user === null) {
     http_response_code(404);
     echo 'Arquivo indisponivel.';
     exit;
 }
 
-$relativePath = (string) ($exportInfo['path'] ?? '');
-$filenameInfo = (string) ($exportInfo['filename'] ?? '');
-$filename = basename($filenameInfo !== '' ? $filenameInfo : $relativePath);
+$token = $_GET['token'] ?? '';
+$exportIdParam = $_GET['export_id'] ?? '';
+
+$relativePath = '';
+$filename = '';
+
+if ($token !== '') {
+    $exportInfo = $_SESSION['last_export_ready'] ?? null;
+
+    if (!$exportInfo || !isset($exportInfo['token']) || !hash_equals((string) $exportInfo['token'], (string) $token)) {
+        http_response_code(404);
+        echo 'Arquivo indisponivel.';
+        exit;
+    }
+
+    $relativePath = (string) ($exportInfo['path'] ?? '');
+    $filenameInfo = (string) ($exportInfo['filename'] ?? '');
+    $filename = basename($filenameInfo !== '' ? $filenameInfo : $relativePath);
+} elseif ($exportIdParam !== '') {
+    $exportId = (int) $exportIdParam;
+    if ($exportId <= 0) {
+        http_response_code(404);
+        echo 'Arquivo indisponivel.';
+        exit;
+    }
+
+    $exportRecord = ExportService::obterExportacao((int) ($user['id'] ?? 0), $exportId);
+    if ($exportRecord === null) {
+        http_response_code(404);
+        echo 'Arquivo indisponivel.';
+        exit;
+    }
+
+    $relativePath = (string) ($exportRecord['file_path'] ?? '');
+    $filename = basename((string) ($relativePath !== '' ? $relativePath : ('export_' . $exportId . '.csv')));
+} else {
+    http_response_code(404);
+    echo 'Arquivo indisponivel.';
+    exit;
+}
 
 $storageBase = realpath(dirname(__DIR__) . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'exports');
 if ($storageBase === false) {

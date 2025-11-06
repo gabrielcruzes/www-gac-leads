@@ -77,6 +77,23 @@ class ExportService
     }
 
     /**
+     * Recupera uma exporta��ǜo especifica do usu��rio.
+     */
+    public static function obterExportacao(int $userId, int $exportId): ?array
+    {
+        $pdo = Database::getConnection();
+        $stmt = $pdo->prepare('SELECT * FROM exports WHERE user_id = :user_id AND id = :id LIMIT 1');
+        $stmt->execute([
+            ':user_id' => $userId,
+            ':id' => $exportId,
+        ]);
+
+        $export = $stmt->fetch();
+
+        return $export !== false ? $export : null;
+    }
+
+    /**
      * Extrai dinamicamente as colunas que farão parte do CSV.
      */
     private static function extrairCabecalho(array $leads): array

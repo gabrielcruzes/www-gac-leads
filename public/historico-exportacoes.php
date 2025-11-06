@@ -46,7 +46,7 @@ renderPageStart('Histórico de Exportações', 'historico');
                             <td class="px-4 py-2 text-slate-600"><?php echo htmlspecialchars($export['segment'] ?? '-'); ?></td>
                             <td class="px-4 py-2 text-slate-600"><?php echo (int) ($export['quantity'] ?? 0); ?></td>
                             <td class="px-4 py-2">
-                                <a href="../<?php echo htmlspecialchars($export['file_path']); ?>" class="text-blue-600 hover:text-blue-700" download>
+                                <a href="download-export.php?export_id=<?php echo (int) $export['id']; ?>" class="text-blue-600 hover:text-blue-700" download>
                                     Baixar CSV
                                 </a>
                             </td>
