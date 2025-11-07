@@ -198,6 +198,56 @@ SQL;
     }
 
     /**
+     * Remove uma lista do usuario movendo os itens para a lista padrao.
+     */
+    public static function removerLista(int $userId, int $listaId): bool
+    {
+        if ($listaId <= 0) {
+            return false;
+        }
+
+        $lista = self::obterLista($userId, $listaId);
+        if (!$lista) {
+            return false;
+        }
+
+        $listaPadrao = self::obterOuCriarListaPadrao($userId);
+        if (!$listaPadrao || (int) $listaPadrao['id'] === $listaId) {
+            return false;
+        }
+
+        $pdo = Database::getConnection();
+
+        try {
+            $pdo->beginTransaction();
+
+            $stmtMover = $pdo->prepare('UPDATE lead_list_items SET lead_list_id = :destino WHERE user_id = :user AND lead_list_id = :lista');
+            $stmtMover->execute([
+                ':destino' => (int) $listaPadrao['id'],
+                ':user' => $userId,
+                ':lista' => $listaId,
+            ]);
+
+            $stmtDelete = $pdo->prepare('DELETE FROM lead_lists WHERE id = :id AND user_id = :user');
+            $stmtDelete->execute([
+                ':id' => $listaId,
+                ':user' => $userId,
+            ]);
+
+            $pdo->commit();
+
+            return $stmtDelete->rowCount() > 0;
+        } catch (\Throwable $exception) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            error_log('Erro ao remover lista: ' . $exception->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
      * Recupera os metadados de uma lista pertencente ao usuario.
      */
     public static function obterLista(int $userId, int $listaId): ?array
@@ -258,31 +308,41 @@ SQL;
         $summary = $leadResultado['summary'] ?? LeadService::resumirLead($leadData);
 
         $cnpjNumerico = $summary['cnpj_raw'] ?? self::normalizarCnpj($summary['cnpj'] ?? null);
+        $pdo = Database::getConnection();
 
-        // Evita duplicacao de leads na mesma lista.
+        $itemExistente = null;
         if ($cnpjNumerico) {
-            $pdo = Database::getConnection();
-            $stmtCheck = $pdo->prepare('SELECT id FROM lead_list_items WHERE lead_list_id = :lista AND user_id = :user AND cnpj = :cnpj LIMIT 1');
+            $stmtCheck = $pdo->prepare('SELECT id, lead_list_id FROM lead_list_items WHERE user_id = :user AND cnpj = :cnpj LIMIT 1');
             $stmtCheck->execute([
-                ':lista' => $listaId,
                 ':user' => $userId,
                 ':cnpj' => $cnpjNumerico,
             ]);
-            if ($stmtCheck->fetch(PDO::FETCH_ASSOC)) {
-                return ['success' => false, 'message' => 'Este lead ja foi adicionado a lista.'];
+            $registro = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+            if ($registro) {
+                $itemExistente = $registro;
+                if ((int) $registro['lead_list_id'] === $listaId) {
+                    return ['success' => false, 'message' => 'Este lead ja foi adicionado a lista.'];
+                }
             }
         }
 
-        $pdo = Database::getConnection();
-        $stmt = $pdo->prepare('INSERT INTO lead_list_items (lead_list_id, user_id, lead_id, cnpj, summary, data) VALUES (:lista, :user, :lead_id, :cnpj, :summary, :data)');
-        $stmt->execute([
+        $params = [
             ':lista' => $listaId,
             ':user' => $userId,
             ':lead_id' => $leadResultado['id'] ?? null,
             ':cnpj' => $cnpjNumerico,
             ':summary' => json_encode($summary, JSON_UNESCAPED_UNICODE),
             ':data' => json_encode($leadData, JSON_UNESCAPED_UNICODE),
-        ]);
+        ];
+
+        if ($itemExistente) {
+            $params[':id'] = (int) $itemExistente['id'];
+            $stmtAtualiza = $pdo->prepare('UPDATE lead_list_items SET lead_list_id = :lista, lead_id = :lead_id, cnpj = :cnpj, summary = :summary, data = :data WHERE id = :id AND user_id = :user');
+            $stmtAtualiza->execute($params);
+        } else {
+            $stmt = $pdo->prepare('INSERT INTO lead_list_items (lead_list_id, user_id, lead_id, cnpj, summary, data) VALUES (:lista, :user, :lead_id, :cnpj, :summary, :data)');
+            $stmt->execute($params);
+        }
 
         return [
             'success' => true,

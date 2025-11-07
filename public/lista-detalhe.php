@@ -33,6 +33,10 @@ if (!$lista) {
     exit;
 }
 
+$listaPadrao = LeadListService::obterOuCriarListaPadrao($userId);
+$defaultListId = $listaPadrao ? (int) ($listaPadrao['id'] ?? 0) : 0;
+$isDefaultList = $defaultListId > 0 && $defaultListId === $listaId;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
     if ($acao === 'renomear') {
@@ -49,6 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['flash_error'] = 'Nao foi possivel atualizar o nome da lista.';
             }
         }
+        header('Location: lista-detalhe.php?id=' . $listaId);
+        exit;
+    } elseif ($acao === 'excluir') {
+        $listaPostId = (int) ($_POST['lista_id'] ?? 0);
+        if ($listaPostId !== $listaId) {
+            $_SESSION['flash_error'] = 'Lista invalida.';
+            header('Location: lista-detalhe.php?id=' . $listaId);
+            exit;
+        }
+
+        if (LeadListService::removerLista($userId, $listaId)) {
+            $_SESSION['flash_success'] = 'Lista removida com sucesso. Os leads foram movidos para "' . LeadListService::DEFAULT_LIST_NAME . '".';
+            header('Location: listas.php');
+            exit;
+        }
+
+        $_SESSION['flash_error'] = 'Nao foi possivel remover a lista.';
         header('Location: lista-detalhe.php?id=' . $listaId);
         exit;
     }
@@ -99,6 +120,17 @@ renderPageStart('Lista: ' . $lista['name'], 'listas');
                             Exportar lista
                         </button>
                     </form>
+                <?php endif; ?>
+                <?php if (!$isDefaultList): ?>
+                    <form method="post" onsubmit="return confirm('Tem certeza de que deseja excluir esta lista? Os leads serao movidos para <?php echo LeadListService::DEFAULT_LIST_NAME; ?>.');">
+                        <input type="hidden" name="acao" value="excluir">
+                        <input type="hidden" name="lista_id" value="<?php echo (int) $listaId; ?>">
+                        <button type="submit" class="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium">
+                            Excluir lista
+                        </button>
+                    </form>
+                <?php else: ?>
+                    <p class="text-xs text-slate-400">Leads sem lista permanecem aqui.</p>
                 <?php endif; ?>
             </div>
         </div>

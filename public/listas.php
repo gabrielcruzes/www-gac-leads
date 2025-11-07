@@ -38,6 +38,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['flash_error'] = 'Nao foi possivel atualizar o nome da lista.';
             }
         }
+    } elseif ($acao === 'excluir') {
+        $listaId = (int) ($_POST['lista_id'] ?? 0);
+
+        if ($listaId <= 0) {
+            $_SESSION['flash_error'] = 'Lista invalida para exclusao.';
+        } elseif (LeadListService::removerLista($userId, $listaId)) {
+            $_SESSION['flash_success'] = 'Lista removida e leads movidos para "' . LeadListService::DEFAULT_LIST_NAME . '".';
+        } else {
+            $_SESSION['flash_error'] = 'Nao foi possivel remover a lista selecionada.';
+        }
     } else {
         $nome = trim($_POST['nome_lista'] ?? '');
 
@@ -58,6 +68,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $listas = LeadListService::listarListas($userId);
+$listaPadrao = LeadListService::obterOuCriarListaPadrao($userId);
+$defaultListId = $listaPadrao ? (int) ($listaPadrao['id'] ?? 0) : 0;
 
 renderPageStart('Listas de Leads', 'listas');
 ?>
@@ -97,6 +109,7 @@ renderPageStart('Listas de Leads', 'listas');
         <?php else: ?>
             <div class="grid md:grid-cols-2 gap-4">
                 <?php foreach ($listas as $lista): ?>
+                    <?php $isDefaultList = $defaultListId > 0 && (int) $lista['id'] === $defaultListId; ?>
                     <div class="border border-slate-200 rounded-xl p-4 bg-slate-50">
                         <div class="flex items-start justify-between mb-3">
                             <div class="flex items-center gap-2">
@@ -124,9 +137,22 @@ renderPageStart('Listas de Leads', 'listas');
                                 Salvar nome
                             </button>
                         </form>
-                        <a href="lista-detalhe.php?id=<?php echo (int) $lista['id']; ?>" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
-                            Ver detalhes
-                        </a>
+                        <div class="flex flex-wrap items-center gap-3">
+                            <a href="lista-detalhe.php?id=<?php echo (int) $lista['id']; ?>" class="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
+                                Ver detalhes
+                            </a>
+                            <?php if (!$isDefaultList): ?>
+                                <form method="post" onsubmit="return confirm('Tem certeza de que deseja excluir esta lista? Os leads serao movidos para <?php echo LeadListService::DEFAULT_LIST_NAME; ?>.');">
+                                    <input type="hidden" name="acao" value="excluir">
+                                    <input type="hidden" name="lista_id" value="<?php echo (int) $lista['id']; ?>">
+                                    <button type="submit" class="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium">
+                                        Excluir lista
+                                    </button>
+                                </form>
+                            <?php else: ?>
+                                <span class="text-xs text-slate-400">Leads sem lista permanecem aqui.</span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endforeach; ?>
             </div>
