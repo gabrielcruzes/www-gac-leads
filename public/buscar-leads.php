@@ -132,6 +132,7 @@ $formState = [
     'somente_fixo' => false,
     'somente_matriz' => false,
     'somente_filial' => false,
+    'somente_sem_lista' => false,
     'com_email' => true,
     'com_telefone' => false,
     'excluir_email_contab' => false,
@@ -183,6 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $formState['somente_fixo'] = !empty($_POST['somente_fixo']);
     $formState['somente_matriz'] = !empty($_POST['somente_matriz']);
     $formState['somente_filial'] = !empty($_POST['somente_filial']);
+    $formState['somente_sem_lista'] = !empty($_POST['somente_sem_lista']);
     $formState['com_email'] = !empty($_POST['com_email']);
     $formState['com_telefone'] = !empty($_POST['com_telefone']);
     $formState['excluir_email_contab'] = !empty($_POST['excluir_email_contab']);
@@ -253,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'com_email' => $formState['com_email'],
             'com_telefone' => $formState['com_telefone'],
             'excluir_email_contab' => $formState['excluir_email_contab'],
+            'somente_sem_lista' => $formState['somente_sem_lista'],
             'excluir_empresas_visualizadas' => false,
             'matriz_filial' => $formState['matriz_filial'],
         ];
@@ -512,6 +515,13 @@ renderPageStart('Buscar Leads', 'buscar');
                     <input type="checkbox" name="excluir_email_contab" value="1" <?php echo $formState['excluir_email_contab'] ? 'checked' : ''; ?>>
                     <span>Excluir e-mails contabeis</span>
                 </label>
+                <label class="flex items-start gap-2 text-sm text-slate-600 mb-1">
+                    <input type="checkbox" name="somente_sem_lista" value="1" <?php echo $formState['somente_sem_lista'] ? 'checked' : ''; ?>>
+                    <span>
+                        Mostrar apenas empresas que ainda não estão em nenhuma lista
+                        <span class="block text-[11px] text-slate-500">Oculta os contatos já organizados nas suas listas.</span>
+                    </span>
+                </label>
             </div>
 
             <div class="md:col-span-6 flex justify-end">
@@ -613,6 +623,9 @@ renderPageStart('Buscar Leads', 'buscar');
                 <p class="text-xs text-slate-500 mt-1">
                     Exibindo <?php echo count($leads); ?> empresas na pagina <?php echo $currentPage; ?> de <?php echo max(1, $totalPaginas); ?> (<?php echo $pageSize; ?> por pagina). Total encontrados: <?php echo (int) $totalResultados; ?>.
                 </p>
+                <?php if (!empty($formState['somente_sem_lista'])): ?>
+                    <p class="text-xs text-amber-600 mt-1">Filtro ativo: apenas empresas que ainda não pertencem a nenhuma lista.</p>
+                <?php endif; ?>
             </div>
             <div class="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div class="flex items-center gap-2">
@@ -752,9 +765,6 @@ renderPageStart('Buscar Leads', 'buscar');
 <script src="assets/js/buscar-leads.js"></script>
 <?php
 renderPageEnd();
-
-
-
 
 
 

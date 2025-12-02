@@ -351,6 +351,7 @@ document.addEventListener('DOMContentLoaded', function () {
             setCheckbox('com_email', filtros.com_email);
             setCheckbox('com_telefone', filtros.com_telefone);
             setCheckbox('excluir_email_contab', filtros.excluir_email_contab);
+            setCheckbox('somente_sem_lista', filtros.somente_sem_lista);
 
             const situacaoValor = filtros.situacao !== undefined ? filtros.situacao : filtros.situacao_cadastral;
             applySituacao(situacaoValor);
@@ -546,5 +547,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
-
 

@@ -30,12 +30,26 @@ class LeadService
         $leadsApi = $resultadoApi['leads'] ?? [];
         $armazenados = self::armazenarLeadsNaSessao($leadsApi, $filtros);
 
+        if (!empty($filtros['somente_sem_lista'])) {
+            $armazenados = array_values(array_filter($armazenados, static function ($lead) {
+                return empty($lead['already_imported']);
+            }));
+        }
+
         $limite = isset($filtros['quantidade']) ? (int) $filtros['quantidade'] : count($leadsApi);
         $hasMore = (bool) ($resultadoApi['has_more'] ?? (count($leadsApi) >= $limite));
+        if (!empty($filtros['somente_sem_lista'])) {
+            $hasMore = false;
+        }
+
+        $totalRetornado = (int) ($resultadoApi['total'] ?? count($armazenados));
+        if (!empty($filtros['somente_sem_lista'])) {
+            $totalRetornado = count($armazenados);
+        }
 
         return [
             'leads' => $armazenados,
-            'total' => (int) ($resultadoApi['total'] ?? count($armazenados)),
+            'total' => $totalRetornado,
             'has_more' => $hasMore,
         ];
     }

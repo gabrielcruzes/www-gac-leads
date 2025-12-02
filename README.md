@@ -15,6 +15,10 @@ Aplicacao PHP para busca, gerenciamento e exportacao de leads B2B.
 1. Copie o arquivo de exemplo: `cp .env.example .env`
 2. Ajuste os valores conforme seu ambiente local.
 3. Quando utilizar Docker, mantenha `DB_HOST=db`. Em producao defina o host real do banco.
+4. Configure tambem as variaveis do Asaas:
+   - `ASAAS_API_KEY` – token obtido no painel do Asaas.
+   - `ASAAS_ENVIRONMENT` – `sandbox` ou `production`.
+   - `ASAAS_WEBHOOK_TOKEN` – token secreto para validar o webhook.
 
 > **Importante:** O arquivo `.env` nao deve ser commitado nem enviado ao GitHub.
 
@@ -65,6 +69,9 @@ O [Dokploy](https://dokploy.com/) orquestra deploys Docker a partir de repositor
    - `DB_USER=<usuario>`
    - `DB_PASS=<senha>`
    - `CASA_DOS_DADOS_API_KEY=<token real>`
+   - `ASAAS_API_KEY=<token do Asaas>`
+   - `ASAAS_ENVIRONMENT=production`
+   - `ASAAS_WEBHOOK_TOKEN=<token do webhook>`
    - `LEAD_VIEW_COST=<valor desejado>`
 4. Na aba de volumes/persistencia, monte um volume em `/var/www/html/storage/exports` para manter as exportacoes geradas.
 5. Se preferir reutilizar o `docker-compose.yml`, importe-o como stack no Dokploy e ajuste os secrets diretamente por la.
@@ -88,6 +95,18 @@ O [Dokploy](https://dokploy.com/) orquestra deploys Docker a partir de repositor
 - `docker compose up --build`: sobe ambiente local completo.
 - `docker compose exec app php tools/process_lead_jobs.php`: roda o worker manualmente.
 - `docker compose down -v`: encerra containers e remove volumes (cuidado, apaga dados).
+
+## Pagamentos via PIX (Asaas)
+
+Foi adicionada uma camada de pagamentos integrada com a API oficial do Asaas para venda de créditos.
+
+- Endpoints internos:
+  - `POST /api/payments/create.php` – gera um QR Code PIX a partir do plano (`basic`, `pro`, `premium`).
+  - `GET /api/payments/status.php?id={transactionId}` – consulta o status da transação.
+  - `POST /api/payments/webhook.php` – recepciona eventos do Asaas. Configure o cabeçalho `X-Webhook-Token` com o valor de `ASAAS_WEBHOOK_TOKEN`.
+- Todos os registros ficam em `transactions` (vide `database/schema.sql`); sucessos e erros são registrados em `storage/logs/payments.log`.
+- Ao receber `PAYMENT_RECEIVED` ou `PAYMENT_CONFIRMED` o sistema marca a transação como paga e soma os créditos informados ao usuário.
+- A tela `public/comprar-creditos.php` consome os endpoints acima, gera o QR Code automaticamente e inicia o polling até a confirmação.
 
 ## Checklist de seguranca
 

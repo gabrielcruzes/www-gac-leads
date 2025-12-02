@@ -11,6 +11,7 @@ DROP TABLE IF EXISTS lead_lists;
 DROP TABLE IF EXISTS api_logs;
 DROP TABLE IF EXISTS exports;
 DROP TABLE IF EXISTS credit_orders;
+DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS purchases;
 DROP TABLE IF EXISTS leads;
 DROP TABLE IF EXISTS cnae_searches;
@@ -97,6 +98,27 @@ CREATE TABLE credit_orders (
   payment_status ENUM('pending','paid','cancelled') DEFAULT 'paid',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE transactions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  plan_type ENUM('basic','pro','premium') NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  credits INT NOT NULL,
+  asaas_payment_id VARCHAR(80) NOT NULL,
+  status ENUM('pending','paid','failed','expired') NOT NULL DEFAULT 'pending',
+  pix_qrcode LONGTEXT NULL,
+  pix_payload TEXT NULL,
+  pix_expiration DATETIME DEFAULT NULL,
+  due_date DATE DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  paid_at DATETIME DEFAULT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE KEY uniq_payment (asaas_payment_id),
+  INDEX idx_transactions_user_status (user_id, status),
+  INDEX idx_transactions_status_created (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE exports (
