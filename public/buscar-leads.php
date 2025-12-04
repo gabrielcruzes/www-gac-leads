@@ -114,11 +114,44 @@ if (!function_exists('normalizeMunicipio')) {
     }
 }
 
+if (!function_exists('parseTextSearchList')) {
+    /**
+     * Separa termos informados para a busca textual preservando a grafia original.
+     *
+     * @return array<int, string>
+     */
+    function parseTextSearchList(?string $raw): array
+    {
+        if ($raw === null) {
+            return [];
+        }
+
+        $trimmed = trim($raw);
+        if ($trimmed === '') {
+            return [];
+        }
+
+        $parts = preg_split('/[\r\n,;]+/', $trimmed);
+        if ($parts === false) {
+            $parts = [$trimmed];
+        }
+
+        $parts = array_map(static fn($item) => trim($item), $parts);
+
+        return array_values(array_filter($parts, static fn($item) => $item !== ''));
+    }
+}
+
 $formState = [
     'cnae' => '',
     'uf' => '',
     'municipio' => '',
     'municipio_display' => '',
+    'busca_texto' => '',
+    'busca_tipo' => 'exata',
+    'busca_razao_social' => true,
+    'busca_nome_fantasia' => true,
+    'busca_nome_socio' => true,
     'quantidade' => $pageSize,
     'pagina' => 1,
     'situacao' => 'ATIVA',
@@ -169,6 +202,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($formState['municipio_display'] !== '') {
         $formState['municipio_display'] = trim($formState['municipio_display']);
     }
+    $formState['busca_texto'] = trim((string) ($_POST['busca_texto'] ?? ''));
+    $tipoBuscaRecebido = strtolower(trim((string) ($_POST['busca_tipo'] ?? 'exata')));
+    $formState['busca_tipo'] = in_array($tipoBuscaRecebido, ['exata', 'radical'], true) ? $tipoBuscaRecebido : 'exata';
+    $formState['busca_razao_social'] = !empty($_POST['busca_razao_social']);
+    $formState['busca_nome_fantasia'] = !empty($_POST['busca_nome_fantasia']);
+    $formState['busca_nome_socio'] = !empty($_POST['busca_nome_socio']);
+    $buscaTextosList = parseTextSearchList($formState['busca_texto']);
     $formState['quantidade'] = $pageSize;
     $formState['pagina'] = max(1, (int) ($_POST['pagina'] ?? 1));
     if (!$pageNavigation) {
@@ -224,6 +264,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Capital social maximo invalido.';
     } elseif ($capitalMax !== null && $capitalMax < 0) {
         $errors[] = 'Capital social maximo nao pode ser negativo.';
+    }
+
+    if ($buscaTextosList && !$formState['busca_razao_social'] && !$formState['busca_nome_fantasia'] && !$formState['busca_nome_socio']) {
+        $errors[] = 'Selecione ao menos um campo para aplicar a busca textual.';
     }
 
     if ($capitalMin !== null && $capitalMax !== null && $capitalMin > $capitalMax) {
@@ -312,6 +356,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $filtros['simples'] = null;
         }
         $filtros['simples_excluir'] = $formState['simples_excluir'];
+
+        if ($buscaTextosList) {
+            $filtros['busca_textual'] = [[
+                'texto' => $buscaTextosList,
+                'tipo_busca' => $formState['busca_tipo'],
+                'razao_social' => (bool) $formState['busca_razao_social'],
+                'nome_fantasia' => (bool) $formState['busca_nome_fantasia'],
+                'nome_socio' => (bool) $formState['busca_nome_socio'],
+            ]];
+        }
 
         if (!empty($formState['data_abertura_inicio']) || !empty($formState['data_abertura_fim']) || !empty($formState['data_abertura_ultimos_dias'])) {
             $filtros['data_abertura'] = [
@@ -419,6 +473,35 @@ renderPageStart('Buscar Leads', 'buscar');
             <div class="md:col-span-3">
                 <label class="block text-sm font-medium text-slate-600 mb-1">CNPJs</label>
                 <textarea name="cnpj" rows="3" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Separe multiplos CNPJs com virgula ou quebra de linha"><?php echo htmlspecialchars($formState['cnpj']); ?></textarea>
+            </div>
+            <div class="md:col-span-3">
+                <label class="block text-sm font-medium text-slate-600 mb-1">Busca textual</label>
+                <textarea name="busca_texto" rows="3" class="w-full border border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Use virgula ou quebra de linha para buscar multiplos termos"><?php echo htmlspecialchars($formState['busca_texto']); ?></textarea>
+                <p class="text-xs text-slate-400 mt-1">Utilize nomes, palavras-chave ou termos especificos que deseje encontrar.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    <div>
+                        <span class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Tipo de busca</span>
+                        <select name="busca_tipo" class="w-full border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-600">
+                            <option value="exata" <?php echo $formState['busca_tipo'] === 'exata' ? 'selected' : ''; ?>>Exata</option>
+                            <option value="radical" <?php echo $formState['busca_tipo'] === 'radical' ? 'selected' : ''; ?>>Radical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <span class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Aplicar em</span>
+                        <label class="flex items-center gap-2 text-sm text-slate-600 mb-1">
+                            <input type="checkbox" name="busca_razao_social" value="1" <?php echo $formState['busca_razao_social'] ? 'checked' : ''; ?>>
+                            <span>Razao social</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600 mb-1">
+                            <input type="checkbox" name="busca_nome_fantasia" value="1" <?php echo $formState['busca_nome_fantasia'] ? 'checked' : ''; ?>>
+                            <span>Nome fantasia</span>
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-slate-600">
+                            <input type="checkbox" name="busca_nome_socio" value="1" <?php echo $formState['busca_nome_socio'] ? 'checked' : ''; ?>>
+                            <span>Nome de socios</span>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div class="md:col-span-3">
@@ -765,12 +848,5 @@ renderPageStart('Buscar Leads', 'buscar');
 <script src="assets/js/buscar-leads.js"></script>
 <?php
 renderPageEnd();
-
-
-
-
-
-
-
 
 

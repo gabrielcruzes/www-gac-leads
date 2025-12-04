@@ -199,6 +199,41 @@ class CasaDosDadosApi
             $payload['cnpj'] = array_values($filtros['cnpj']);
         }
 
+        if (!empty($filtros['busca_textual']) && is_array($filtros['busca_textual'])) {
+            $buscasTextuais = [];
+            foreach ($filtros['busca_textual'] as $entrada) {
+                if (!is_array($entrada) || empty($entrada['texto'])) {
+                    continue;
+                }
+
+                $listaTexto = array_values(array_filter(array_map(static fn($valor) => trim((string) $valor), (array) $entrada['texto']), static fn($valor) => $valor !== ''));
+                if (empty($listaTexto)) {
+                    continue;
+                }
+
+                $tipoBusca = isset($entrada['tipo_busca']) && in_array($entrada['tipo_busca'], ['exata', 'radical'], true) ? $entrada['tipo_busca'] : 'exata';
+                $aplicarRazao = isset($entrada['razao_social']) ? (bool) $entrada['razao_social'] : true;
+                $aplicarFantasia = isset($entrada['nome_fantasia']) ? (bool) $entrada['nome_fantasia'] : true;
+                $aplicarSocio = isset($entrada['nome_socio']) ? (bool) $entrada['nome_socio'] : true;
+
+                if (!$aplicarRazao && !$aplicarFantasia && !$aplicarSocio) {
+                    continue;
+                }
+
+                $buscasTextuais[] = [
+                    'texto' => $listaTexto,
+                    'tipo_busca' => $tipoBusca,
+                    'razao_social' => $aplicarRazao,
+                    'nome_fantasia' => $aplicarFantasia,
+                    'nome_socio' => $aplicarSocio,
+                ];
+            }
+
+            if (!empty($buscasTextuais)) {
+                $payload['busca_textual'] = $buscasTextuais;
+            }
+        }
+
         if (!empty($filtros['cnpj_raiz'])) {
             $payload['cnpj_raiz'] = array_values($filtros['cnpj_raiz']);
         }

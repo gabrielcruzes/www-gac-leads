@@ -336,6 +336,8 @@ document.addEventListener('DOMContentLoaded', function () {
             setFieldValue('codigo_natureza_juridica', filtros.codigo_natureza_juridica);
             setFieldValue('cep', filtros.cep);
             setFieldValue('cnpj', filtros.cnpj);
+            setFieldValue('busca_texto', filtros.busca_texto);
+            setFieldValue('busca_tipo', filtros.busca_tipo);
             setFieldValue('data_abertura_inicio', filtros.data_abertura_inicio);
             setFieldValue('data_abertura_fim', filtros.data_abertura_fim);
             setFieldValue('data_abertura_ultimos_dias', filtros.data_abertura_ultimos_dias);
@@ -344,6 +346,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
             setCheckbox('mei_excluir', filtros.mei_excluir);
             setCheckbox('simples_excluir', filtros.simples_excluir);
+            setCheckbox('busca_razao_social', filtros.busca_razao_social !== undefined ? filtros.busca_razao_social : true);
+            setCheckbox('busca_nome_fantasia', filtros.busca_nome_fantasia !== undefined ? filtros.busca_nome_fantasia : true);
+            setCheckbox('busca_nome_socio', filtros.busca_nome_socio !== undefined ? filtros.busca_nome_socio : true);
             setCheckbox('somente_celular', filtros.somente_celular);
             setCheckbox('somente_fixo', filtros.somente_fixo);
             setCheckbox('somente_matriz', filtros.somente_matriz);
@@ -547,4 +552,3 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 });
-
